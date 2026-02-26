@@ -71,7 +71,22 @@ export function createScene(
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0f17);
+  const gradientCanvas = document.createElement("canvas");
+  gradientCanvas.width = 2;
+  gradientCanvas.height = 256;
+  const gctx = gradientCanvas.getContext("2d");
+  if (gctx) {
+    const grad = gctx.createLinearGradient(0, 0, 0, gradientCanvas.height);
+    grad.addColorStop(0, "#6f778a");
+    grad.addColorStop(1, "#2f3547");
+    gctx.fillStyle = grad;
+    gctx.fillRect(0, 0, gradientCanvas.width, gradientCanvas.height);
+    const tex = new THREE.CanvasTexture(gradientCanvas);
+    tex.needsUpdate = true;
+    scene.background = tex;
+  } else {
+    scene.background = new THREE.Color(0x2f3547);
+  }
 
   const rig = createCameraRig(renderer.domElement, { w: container.clientWidth, h: container.clientHeight });
   const camera = rig.camera;
