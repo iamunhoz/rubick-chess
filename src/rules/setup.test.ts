@@ -83,4 +83,24 @@ describe("setup.createInitialGame", () => {
       expect(middleOthers).toEqual(expectedMiddleOthers);
     }
   });
+
+  it("assigns pawn forwardDir toward the face center", () => {
+    const { board } = createInitialGame();
+    const cases = [
+      { face: "F", r: 0, c: 1, dir: "S" },
+      { face: "F", r: 3, c: 1, dir: "N" },
+      { face: "F", r: 1, c: 0, dir: "E" },
+      { face: "F", r: 1, c: 3, dir: "W" },
+      { face: "B", r: 0, c: 2, dir: "S" },
+      { face: "B", r: 3, c: 2, dir: "N" },
+      { face: "B", r: 2, c: 0, dir: "E" },
+      { face: "B", r: 2, c: 3, dir: "W" },
+    ] as const;
+
+    for (const entry of cases) {
+      const pawn = getPiece(board, entry);
+      expect(pawn?.kind).toBe("P");
+      expect(pawn?.forwardDir).toBe(entry.dir);
+    }
+  });
 });
