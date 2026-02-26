@@ -5,9 +5,18 @@ import type { Pos } from "../rules/types";
 type HudBindings = {
   getBoard: () => Board;
   setBoard: (board: Board) => void;
+  getSelection: () => Pos | null;
+  setSelection: (pos: Pos | null) => void;
+  getSelectionMoves: () => Pos[];
 };
 
-export function bindHud(bindings: HudBindings): void {
+type HudApi = { sync: () => void };
+
+function fmtPos(pos: Pos): string {
+  return `${pos.face}:${pos.r}:${pos.c}`;
+}
+
+export function bindHud(bindings: HudBindings): HudApi {
   const btnReset = document.querySelector<HTMLButtonElement>("#btnReset");
   const btnApply = document.querySelector<HTMLButtonElement>("#btnApply");
   const selAbility = document.querySelector<HTMLSelectElement>("#selAbility");
@@ -18,16 +27,21 @@ export function bindHud(bindings: HudBindings): void {
     throw new Error("HUD elements missing");
   }
 
+  const selectionEl = hudSelection;
+  const applyBtn = btnApply;
+  const abilitySel = selAbility;
+  const dirSel = selDir;
+
   btnReset.addEventListener("click", () => {
-    window.location.reload();
+    bindings.setSelection(null);
+    window.location.reload(); // MVP reset: simple and reliable
   });
 
   btnApply.addEventListener("click", () => {
-    // MVP wiring: apply ability from a fixed corner to prove mechanics end-to-end quickly.
-    // Full selection/picking wiring comes next.
-    const from: Pos = { face: "F", r: 0, c: 0 };
-    const dir = selDir.value === "CCW" ? "CCW" : "CW";
-    const kind = selAbility.value;
+    const from = bindings.getSelection();
+    if (!from) return;
+    const dir = dirSel.value === "CCW" ? "CCW" : "CW";
+    const kind = abilitySel.value;
 
     const board = bindings.getBoard();
     let next = board;
@@ -38,5 +52,16 @@ export function bindHud(bindings: HudBindings): void {
     bindings.setBoard(next);
   });
 
-  hudSelection.textContent = "Selection: (MVP placeholder) F:0:0";
+  function sync(): void {
+    const sel = bindings.getSelection();
+    const moves = bindings.getSelectionMoves();
+    selectionEl.textContent = `Selection: ${sel ? fmtPos(sel) : "none"} (${moves.length} moves)`;
+    applyBtn.disabled = !sel || abilitySel.value === "none";
+  }
+
+  abilitySel.addEventListener("change", sync);
+  dirSel.addEventListener("change", sync);
+
+  sync();
+  return { sync };
 }

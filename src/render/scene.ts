@@ -4,7 +4,11 @@ import type { Board } from "../rules/board";
 import { getPiece } from "../rules/board";
 import type { Face, Pos } from "../rules/types";
 
-type SceneApi = { sync: () => void };
+type SceneApi = {
+  sync: () => void;
+  setSelected: (pos: Pos | null) => void;
+  setHighlights: (positions: Pos[]) => void;
+};
 
 const faces: Face[] = ["U", "D", "F", "B", "L", "R"];
 const TILE_SIZE = 1;
@@ -48,7 +52,11 @@ function pieceLabel(kind: string, color: string): string {
   return `${color}${kind}`;
 }
 
-export function createScene(container: HTMLElement, getBoard: () => Board): SceneApi {
+export function createScene(
+  container: HTMLElement,
+  getBoard: () => Board,
+  opts?: { onTileClick?: (pos: Pos) => void },
+): SceneApi {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.max(1, window.devicePixelRatio || 1));
   renderer.setSize(container.clientWidth, container.clientHeight, false);
@@ -74,15 +82,26 @@ export function createScene(container: HTMLElement, getBoard: () => Board): Scen
 
   const tiles = new Map<string, any>();
   const tileGeom = new THREE.PlaneGeometry(TILE_SIZE * 0.95, TILE_SIZE * 0.95);
-  const tileMatA = new THREE.MeshStandardMaterial({ color: 0x2c3242, roughness: 0.95, metalness: 0.0 });
-  const tileMatB = new THREE.MeshStandardMaterial({ color: 0x1f2432, roughness: 0.95, metalness: 0.0 });
+  const baseA = 0x2c3242;
+  const baseB = 0x1f2432;
+  const highlightColor = 0x2f8cff;
+  const moveColor = 0x2fe58c;
 
   for (const pos of allPositions()) {
     const { position, normal } = posToWorld(pos);
-    const mesh = new THREE.Mesh(tileGeom, (pos.r + pos.c) % 2 === 0 ? tileMatA : tileMatB);
+    const base = (pos.r + pos.c) % 2 === 0 ? baseA : baseB;
+    const mat = new THREE.MeshStandardMaterial({
+      color: base,
+      emissive: 0x000000,
+      emissiveIntensity: 0.9,
+      roughness: 0.95,
+      metalness: 0.0,
+    });
+    const mesh = new THREE.Mesh(tileGeom, mat);
     mesh.position.copy(position);
     mesh.lookAt(position.clone().add(normal));
     root.add(mesh);
+    mesh.userData = { baseColor: base };
     tiles.set(posKey(pos), mesh);
   }
 
@@ -91,6 +110,31 @@ export function createScene(container: HTMLElement, getBoard: () => Board): Scen
 
   const pieceMeshes = new Map<string, any>();
   const spriteMat = new THREE.SpriteMaterial({ color: 0xffffff });
+
+  let selectedKey: string | null = null;
+  const highlighted = new Set<string>();
+
+  function setSelected(pos: Pos | null): void {
+    selectedKey = pos ? posKey(pos) : null;
+    refreshTileColors();
+  }
+
+  function setHighlights(positions: Pos[]): void {
+    highlighted.clear();
+    for (const p of positions) highlighted.add(posKey(p));
+    refreshTileColors();
+  }
+
+  function refreshTileColors(): void {
+    for (const [key, mesh] of tiles.entries()) {
+      const mat = mesh.material as any;
+      const base = mesh.userData.baseColor as number;
+      mat.color.setHex(base);
+      mat.emissive.setHex(0x000000);
+      if (highlighted.has(key)) mat.emissive.setHex(moveColor);
+      if (selectedKey === key) mat.emissive.setHex(highlightColor);
+    }
+  }
 
   function resizeIfNeeded(): void {
     const w = container.clientWidth;
@@ -158,11 +202,13 @@ export function createScene(container: HTMLElement, getBoard: () => Board): Scen
     const [key] = entry;
     const [face, r, c] = key.split(":");
     const pos: Pos = { face: face as Face, r: Number(r) as Pos["r"], c: Number(c) as Pos["c"] };
+    opts?.onTileClick?.(pos);
     const piece = getPiece(getBoard(), pos);
-    console.log("tile", pos, piece);
+    if (piece) console.log("tile", pos, piece);
   });
 
   animate();
 
-  return { sync };
+  refreshTileColors();
+  return { sync, setSelected, setHighlights };
 }
