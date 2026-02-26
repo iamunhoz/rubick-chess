@@ -2,9 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { applyAbility, isCorner, type Ability } from "./abilities";
 import { createEmptyBoard, getPiece, setPiece } from "./board";
+import { createInitialGame } from "./setup";
 import { step } from "./topology";
 import { turnFace } from "./turns";
 import type { Pos } from "./types";
+
+function findPiecePosById(board: { pieces: ReadonlyMap<string, { id: string }> }, id: string): Pos | null {
+  for (const [key, piece] of board.pieces.entries()) {
+    if (piece.id !== id) continue;
+    const [face, r, c] = key.split(":");
+    return { face: face as Pos["face"], r: Number(r) as Pos["r"], c: Number(c) as Pos["c"] };
+  }
+  return null;
+}
 
 describe("abilities", () => {
   it("detects corners", () => {
@@ -37,6 +47,22 @@ describe("abilities", () => {
 
     const aCol = applyAbility(board, { kind: "LayerTurn", from: pos, axis: "col", dir: "CW" });
     expect(aCol).toEqual(turnFace(board, colFace, "CW"));
+  });
+
+  it("layer turn from starting rook changes the game state", () => {
+    const game = createInitialGame();
+    const from: Pos = { face: "F", r: 0, c: 0 };
+    const rookId = "WR-F-0-0";
+
+    const before = findPiecePosById(game.board, rookId);
+    expect(before).toEqual(from);
+
+    const afterBoard = applyAbility(game.board, { kind: "LayerTurn", from, axis: "row", dir: "CW" });
+    const after = findPiecePosById(afterBoard, rookId);
+    expect(after).not.toBeNull();
+    expect(after).not.toEqual(from);
+
+    expect(afterBoard.pieces.size).toBe(32);
   });
 
   it("queen on corner can do both", () => {

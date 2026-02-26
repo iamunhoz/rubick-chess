@@ -123,7 +123,9 @@ export function turnFace(board: Board, face: Face, dir: TurnDir): Board {
   for (const pos of allPositions()) {
     const p = posToPoint(pos);
     const layerCoord = dot(p, axis);
-    if (layerCoord > 0.9) affected.push(pos);
+    // Include the face itself (layerCoord ~= 1) and the adjacent edge strips (layerCoord ~= 1 - TILE/2).
+    // For a 4x4 face, edge-strip centers land at 0.75 along the rotation axis.
+    if (layerCoord >= 1 - TILE / 2 - 1e-6) affected.push(pos);
   }
 
   const moves = new Map<string, Pos>();
