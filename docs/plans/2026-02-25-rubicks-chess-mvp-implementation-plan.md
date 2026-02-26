@@ -23,11 +23,11 @@
 - Create: `playwright.config.ts`
 - Create: `e2e/smoke.spec.ts`
 
-**Step 1: Initialize Vite + TS**
+**Step 1: Initialize Vite + TS (pnpm)**
 
 Run:
-- `npm create vite@latest . -- --template vanilla-ts`
-- `npm install`
+- `pnpm create vite@latest . -- --template vanilla-ts`
+- `pnpm install`
 
 Expected:
 - `src/main.ts` exists
@@ -36,9 +36,9 @@ Expected:
 **Step 2: Add dependencies**
 
 Run:
-- `npm i three`
-- `npm i -D vitest @playwright/test`
-- `npx playwright install --with-deps`
+- `pnpm add three`
+- `pnpm add -D vitest @playwright/test`
+- `pnpm exec playwright install --with-deps`
 
 Expected:
 - `npm ls three vitest @playwright/test` shows installed
@@ -76,8 +76,8 @@ test("renders canvas", async ({ page }) => {
 **Step 5: Run tests once**
 
 Run:
-- `npm test`
-- `npx playwright test`
+- `pnpm test`
+- `pnpm exec playwright test`
 
 Expected:
 - both PASS (smoke test may fail until renderer creates a canvas; if so, keep it skipped until Task 3)
@@ -115,7 +115,7 @@ describe("board", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: FAIL (missing exports)
 
 **Step 3: Implement minimal types and board**
@@ -144,7 +144,7 @@ Create `src/rules/board.ts` with an immutable representation (e.g., Map keyed by
 
 **Step 4: Run tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: PASS
 
 ---
@@ -176,7 +176,7 @@ describe("topology.step", () => {
 
 **Step 2: Run test to verify it fails**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: FAIL
 
 **Step 3: Implement a concrete cube net mapping**
@@ -193,7 +193,7 @@ Add a test that for every position on every face and every dir, `step(...)` retu
 
 **Step 5: Run tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: PASS
 
 ---
@@ -214,7 +214,7 @@ Create targeted tests:
 
 **Step 2: Run tests to see failures**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: FAIL
 
 **Step 3: Implement minimal move generator**
@@ -227,7 +227,7 @@ In `src/rules/moves.ts`:
 
 **Step 4: Run tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: PASS
 
 ---
@@ -246,7 +246,7 @@ Expected: PASS
 
 **Step 2: Run tests (fail)**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: FAIL
 
 **Step 3: Implement applyMove**
@@ -257,7 +257,7 @@ Create:
 
 **Step 4: Run tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: PASS
 
 ---
@@ -277,7 +277,7 @@ end up in correct positions after a CW turn.
 
 **Step 2: Run tests (fail)**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: FAIL
 
 **Step 3: Implement `turnFace(board, face, dir)`**
@@ -292,7 +292,7 @@ Test `CCW` is inverse of `CW`.
 
 **Step 5: Run tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: PASS
 
 ---
@@ -315,7 +315,7 @@ Expected: PASS
 
 **Step 2: Run tests (fail)**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: FAIL
 
 **Step 3: Implement `applyAbility(board, ability): Board`**
@@ -324,7 +324,7 @@ Use `turnFace(...)` under the hood.
 
 **Step 4: Run tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: PASS
 
 ---
@@ -342,7 +342,7 @@ Expected: PASS
 
 **Step 2: Run tests (fail)**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: FAIL
 
 **Step 3: Implement setup**
@@ -353,7 +353,7 @@ Create `createInitialGame()` returning:
 
 **Step 4: Run tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: PASS
 
 ---
@@ -372,7 +372,7 @@ Expected: PASS
 
 **Step 2: Manual check**
 
-Run: `npm run dev`
+Run: `pnpm dev`
 Expected: visible cube with subdivided faces.
 
 ---
@@ -401,7 +401,7 @@ Expected: visible cube with subdivided faces.
 
 **Step 4: Manual check**
 
-Run: `npm run dev`
+Run: `pnpm dev`
 Expected: move pieces across faces.
 
 ---
@@ -458,4 +458,3 @@ Two execution options:
 2. **Parallel Session (separate)** — open a new session using executing-plans and run tasks with checkpoints.
 
 Which approach do you want?
-
