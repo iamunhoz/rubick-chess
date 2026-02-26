@@ -8,6 +8,19 @@ const cache = new Map<ModelKey, any>();
 
 const voxel = 0.16;
 
+const heightScaleByKind: Record<PieceKind, number> = {
+  Q: 1.0,
+  K: 0.97,
+  R: 0.88,
+  B: 0.88,
+  N: 0.8,
+  P: 0.7,
+};
+
+export function heightScaleFor(kind: PieceKind): number {
+  return heightScaleByKind[kind] ?? 1.0;
+}
+
 function palette(color: Color): { base: number; body: number } {
   if (color === "W") return { base: 0xb9c4d8, body: 0xe7eefc };
   return { base: 0x0b0f17, body: 0x1f2432 };
@@ -173,6 +186,8 @@ function build(kind: PieceKind, color: Color): any {
   const maxFootprint = 0.72; // tile is ~1, keep margin
   const s = footprint > 0 ? maxFootprint / footprint : 1;
   g.scale.setScalar(s);
+  const heightScale = heightScaleFor(kind);
+  g.scale.y *= heightScale;
 
   return g;
 }
