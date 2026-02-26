@@ -232,6 +232,10 @@ export function createScene(
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
+  renderer.domElement.addEventListener("contextmenu", (ev: MouseEvent) => {
+    ev.preventDefault();
+  });
+
   let hoveredPieceKey: string | null = null;
   function setHoveredPiece(key: string | null): void {
     if (hoveredPieceKey === key) return;
@@ -268,6 +272,7 @@ export function createScene(
   });
 
   renderer.domElement.addEventListener("pointerdown", (ev: PointerEvent) => {
+    if (ev.button !== 0) return;
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);

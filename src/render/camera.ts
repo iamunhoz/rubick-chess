@@ -30,6 +30,8 @@ function presetDir(preset: SnapPreset): any {
 }
 
 export function createCameraRig(rendererDom: HTMLCanvasElement, initialSize: { w: number; h: number }): CameraRig {
+  rendererDom.style.touchAction = "none";
+
   const camera = new THREE.PerspectiveCamera(50, initialSize.w / Math.max(1, initialSize.h), 0.1, 200);
   camera.position.set(7, 6, 7);
   camera.lookAt(0, 0, 0);
@@ -38,6 +40,12 @@ export function createCameraRig(rendererDom: HTMLCanvasElement, initialSize: { w
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.target.set(0, 0, 0);
+  controls.enablePan = false;
+  controls.mouseButtons = {
+    LEFT: THREE.MOUSE.ROTATE,
+    MIDDLE: THREE.MOUSE.DOLLY,
+    RIGHT: THREE.MOUSE.ROTATE,
+  };
   controls.minDistance = 4;
   controls.maxDistance = 25;
   controls.minPolarAngle = 0.2;
@@ -59,4 +67,3 @@ export function createCameraRig(rendererDom: HTMLCanvasElement, initialSize: { w
 
   return { camera, controls, snapTo, dispose };
 }
-
