@@ -4,7 +4,7 @@ import type { Board } from "../rules/board";
 import { getPiece } from "../rules/board";
 import type { Face, Pos } from "../rules/types";
 import { createCameraRig, type SnapPreset } from "./camera";
-import { createPieceOutline, getPieceModel } from "./pieces";
+import { createPieceOutline, createPieceSilhouette, getPieceModel } from "./pieces";
 
 type SceneApi = {
   sync: () => void;
@@ -111,6 +111,7 @@ export function createScene(
   root.add(piecesGroup);
 
   const pieceMeshes = new Map<string, any>();
+  const silhouetteMeshes = new Map<string, any>();
   const outlineMeshes = new Map<string, any>();
 
   function quatFromUpToNormal(normal: any): any {
@@ -168,6 +169,11 @@ export function createScene(
           if (obj?.isMesh) obj.userData = { pieceKey: key };
         });
 
+        const silhouette = createPieceSilhouette(model);
+        silhouette.userData = { pieceKey: key };
+        silhouetteMeshes.set(key, silhouette);
+        piecesGroup.add(silhouette);
+
         const outline = createPieceOutline(model, 0x2f8cff);
         outline.userData = { pieceKey: key };
         outlineMeshes.set(key, outline);
@@ -184,6 +190,12 @@ export function createScene(
       model.quaternion.copy(quatFromUpToNormal(normal));
       model.userData = { label: pieceLabel(piece.kind, piece.color) };
 
+      const silhouette = silhouetteMeshes.get(key);
+      if (silhouette) {
+        silhouette.position.copy(model.position);
+        silhouette.quaternion.copy(model.quaternion);
+      }
+
       const outline = outlineMeshes.get(key);
       if (outline) {
         outline.position.copy(model.position);
@@ -195,6 +207,9 @@ export function createScene(
       if (present.has(key)) continue;
       piecesGroup.remove(model);
       pieceMeshes.delete(key);
+      const silhouette = silhouetteMeshes.get(key);
+      if (silhouette) piecesGroup.remove(silhouette);
+      silhouetteMeshes.delete(key);
       const outline = outlineMeshes.get(key);
       if (outline) piecesGroup.remove(outline);
       outlineMeshes.delete(key);

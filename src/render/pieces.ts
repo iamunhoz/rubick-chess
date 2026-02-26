@@ -210,3 +210,27 @@ export function createPieceOutline(model: any, color = 0x2f8cff): any {
   outline.visible = false;
   return outline;
 }
+
+export function createPieceSilhouette(model: any): any {
+  const silhouette = model.clone(true);
+  silhouette.scale.multiplyScalar(1.025);
+
+  silhouette.traverse((obj: any) => {
+    if (!obj?.isMesh) return;
+    obj.material = new THREE.MeshStandardMaterial({
+      color: 0x000000,
+      emissive: 0x000000,
+      emissiveIntensity: 0,
+      roughness: 1.0,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      side: THREE.BackSide,
+    });
+    obj.renderOrder = 1;
+  });
+
+  silhouette.visible = true;
+  return silhouette;
+}
