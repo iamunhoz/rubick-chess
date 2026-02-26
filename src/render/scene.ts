@@ -4,6 +4,7 @@ import type { Board } from "../rules/board";
 import { getPiece } from "../rules/board";
 import type { Face, Pos } from "../rules/types";
 import { createCameraRig, type SnapPreset } from "./camera";
+import { getPieceModel } from "./pieces";
 
 type SceneApi = {
   sync: () => void;
@@ -110,7 +111,13 @@ export function createScene(
   root.add(piecesGroup);
 
   const pieceMeshes = new Map<string, any>();
-  const spriteMat = new THREE.SpriteMaterial({ color: 0xffffff });
+
+  function quatFromUpToNormal(normal: any): any {
+    const up = new THREE.Vector3(0, 1, 0);
+    const q = new THREE.Quaternion();
+    q.setFromUnitVectors(up, normal.clone().normalize());
+    return q;
+  }
 
   let selectedKey: string | null = null;
   const highlighted = new Set<string>();
@@ -152,26 +159,24 @@ export function createScene(
     const present = new Set<string>();
     for (const [key, piece] of board.pieces.entries()) {
       present.add(key);
-      let sprite = pieceMeshes.get(key);
-      if (!sprite) {
-        sprite = new THREE.Sprite(spriteMat.clone());
-        const color = piece.color === "W" ? 0xe7eefc : 0x0b0f17;
-        (sprite.material as any).color = new THREE.Color(color);
-        sprite.scale.set(0.65, 0.65, 1);
-        piecesGroup.add(sprite);
-        pieceMeshes.set(key, sprite);
+      let model = pieceMeshes.get(key);
+      if (!model) {
+        model = getPieceModel(piece.kind, piece.color);
+        piecesGroup.add(model);
+        pieceMeshes.set(key, model);
       }
 
       const [face, r, c] = key.split(":");
       const pos: Pos = { face: face as Face, r: Number(r) as Pos["r"], c: Number(c) as Pos["c"] };
       const { position, normal } = posToWorld(pos);
-      sprite.position.copy(position.clone().add(normal.clone().multiplyScalar(0.45)));
-      sprite.userData = { label: pieceLabel(piece.kind, piece.color) };
+      model.position.copy(position.clone().add(normal.clone().multiplyScalar(0.52)));
+      model.quaternion.copy(quatFromUpToNormal(normal));
+      model.userData = { label: pieceLabel(piece.kind, piece.color) };
     }
 
-    for (const [key, sprite] of pieceMeshes.entries()) {
+    for (const [key, model] of pieceMeshes.entries()) {
       if (present.has(key)) continue;
-      piecesGroup.remove(sprite);
+      piecesGroup.remove(model);
       pieceMeshes.delete(key);
     }
   }
