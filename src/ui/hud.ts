@@ -1,8 +1,9 @@
-import { applyAbility, isCorner } from "../rules/abilities";
+import { isCorner } from "../rules/abilities";
 import type { Board } from "../rules/board";
 import { getPiece } from "../rules/board";
 import type { Pos } from "../rules/types";
 import type { SnapPreset } from "../render/camera";
+import type { Ability } from "../rules/abilities";
 
 type HudBindings = {
   getBoard: () => Board;
@@ -11,6 +12,7 @@ type HudBindings = {
   setSelection: (pos: Pos | null) => void;
   getSelectionMoves: () => Pos[];
   snapTo: (preset: SnapPreset) => void;
+  applyAbilityAnimated: (ability: Ability) => void;
 };
 
 type HudApi = { sync: () => void };
@@ -88,11 +90,6 @@ export function bindHud(bindings: HudBindings): HudApi {
     const allowFace = canFaceTurn(from, piece.kind);
     const allowLayer = canLayerTurn(from, piece.kind);
 
-    let next = board;
-    if (kind === "face") next = applyAbility(board, { kind: "FaceTurn", from, dir });
-    if (kind === "layer-row") next = applyAbility(board, { kind: "LayerTurn", from, axis: "row", dir });
-    if (kind === "layer-col") next = applyAbility(board, { kind: "LayerTurn", from, axis: "col", dir });
-
     if (
       (kind === "face" && !allowFace) ||
       ((kind === "layer-row" || kind === "layer-col") && !allowLayer)
@@ -101,12 +98,9 @@ export function bindHud(bindings: HudBindings): HudApi {
       return;
     }
 
-    if (next === board) {
-      selectionEl.textContent = `Selection: ${fmtPos(from)} (${piece.color}${piece.kind}) - rotation had no effect`;
-      return;
-    }
-
-    bindings.setBoard(next);
+    if (kind === "face") bindings.applyAbilityAnimated({ kind: "FaceTurn", from, dir });
+    if (kind === "layer-row") bindings.applyAbilityAnimated({ kind: "LayerTurn", from, axis: "row", dir });
+    if (kind === "layer-col") bindings.applyAbilityAnimated({ kind: "LayerTurn", from, axis: "col", dir });
   });
 
   function sync(): void {

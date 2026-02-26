@@ -13,6 +13,7 @@ type SceneApi = {
   snapTo: (preset: SnapPreset) => void;
   projectToScreen: (world: any) => { x: number; y: number; z: number };
   getPieceAnchorWorld: (pos: Pos) => any;
+  animateTurn: (face: Face, dir: "CW" | "CCW", durationMs: number, onDone: () => void) => void;
 };
 
 const faces: Face[] = ["U", "D", "F", "B", "L", "R"];
@@ -254,6 +255,8 @@ export function createScene(
     ev.preventDefault();
   });
 
+  let isAnimating = false;
+
   let hoveredPieceKey: string | null = null;
   function setHoveredPiece(key: string | null): void {
     if (hoveredPieceKey === key) return;
@@ -274,6 +277,7 @@ export function createScene(
   }
 
   renderer.domElement.addEventListener("pointermove", (ev: PointerEvent) => {
+    if (isAnimating) return;
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
@@ -290,6 +294,7 @@ export function createScene(
   });
 
   renderer.domElement.addEventListener("pointerdown", (ev: PointerEvent) => {
+    if (isAnimating) return;
     if (ev.button !== 0) return;
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
@@ -322,8 +327,97 @@ export function createScene(
     if (piece) console.log("tile", pos, piece);
   });
 
+  function easeInOut(t: number): number {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  function faceAxis(face: Face): any {
+    switch (face) {
+      case "F":
+        return new THREE.Vector3(0, 0, 1);
+      case "B":
+        return new THREE.Vector3(0, 0, -1);
+      case "U":
+        return new THREE.Vector3(0, 1, 0);
+      case "D":
+        return new THREE.Vector3(0, -1, 0);
+      case "R":
+        return new THREE.Vector3(1, 0, 0);
+      case "L":
+        return new THREE.Vector3(-1, 0, 0);
+    }
+  }
+
+  function animateTurn(face: Face, dir: "CW" | "CCW", durationMs: number, onDone: () => void): void {
+    if (isAnimating) return;
+    isAnimating = true;
+    setHoveredPiece(null);
+
+    const axis = faceAxis(face).normalize();
+    const angle = dir === "CW" ? -Math.PI / 2 : Math.PI / 2;
+
+    const pivot = new THREE.Group();
+    root.add(pivot);
+
+    // Optional: a faint overlay plane to emphasize the turning layer.
+    const overlay = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.1, 4.1),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.06,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.15,
+        depthWrite: false,
+      }),
+    );
+    overlay.position.copy(axis.clone().multiplyScalar(2.02));
+    overlay.lookAt(overlay.position.clone().add(axis));
+    pivot.add(overlay);
+
+    const threshold = 1.5 - 1e-6;
+    const affected: any[] = [];
+    const parents = new Map<any, any>();
+
+    for (const [key, model] of pieceMeshes.entries()) {
+      const d = model.position.dot(axis);
+      if (d < threshold) continue;
+      const pack = [model, silhouetteMeshes.get(key), outlineMeshes.get(key)].filter(Boolean);
+      for (const obj of pack) {
+        if (parents.has(obj)) continue;
+        parents.set(obj, obj.parent);
+        affected.push(obj);
+      }
+    }
+
+    for (const obj of affected) pivot.attach(obj);
+
+    const start = performance.now();
+    function tick(now: number): void {
+      const t = Math.min(1, (now - start) / durationMs);
+      const e = easeInOut(t);
+      pivot.setRotationFromAxisAngle(axis, angle * e);
+      if (t < 1) {
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      // Detach and cleanup.
+      for (const obj of affected) {
+        const p = parents.get(obj);
+        if (p) p.attach(obj);
+      }
+      root.remove(pivot);
+
+      isAnimating = false;
+      onDone();
+    }
+
+    requestAnimationFrame(tick);
+  }
+
   animate();
 
   refreshTileColors();
-  return { sync, setSelected, setHighlights, snapTo: rig.snapTo, projectToScreen, getPieceAnchorWorld };
+  return { sync, setSelected, setHighlights, snapTo: rig.snapTo, projectToScreen, getPieceAnchorWorld, animateTurn };
 }

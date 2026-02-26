@@ -5,9 +5,11 @@ import { applyMove } from "./rules/apply";
 import { getPiece } from "./rules/board";
 import { legalMoves } from "./rules/moves";
 import { applyAbility, isCorner } from "./rules/abilities";
+import { step } from "./rules/topology";
 import { createScene } from "./render/scene";
 import { bindHud } from "./ui/hud";
 import type { Pos } from "./rules/types";
+import type { Ability } from "./rules/abilities";
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("#app not found");
@@ -40,6 +42,7 @@ app.innerHTML = `
 let game = createInitialGame();
 let selection: Pos | null = null;
 let selectionMoves: Pos[] = [];
+let isAnimating = false;
 
 const viewport = document.querySelector<HTMLDivElement>("#viewport");
 if (!viewport) throw new Error("#viewport not found");
@@ -155,27 +158,66 @@ function rebuildBubble(): void {
     hud.sync();
   }
 
+  function turnedFaceFor(ability: Ability): Pos["face"] {
+    if (ability.kind === "FaceTurn") return ability.from.face;
+    if (ability.axis === "row") {
+      const dir = ability.from.r === 0 ? "N" : "S";
+      return step(ability.from, dir).to.face;
+    }
+    const dir = ability.from.c === 0 ? "W" : "E";
+    return step(ability.from, dir).to.face;
+  }
+
+  function applyAbilityAnimated(ability: Ability): void {
+    if (isAnimating) return;
+    isAnimating = true;
+    bubble.style.pointerEvents = "none";
+    bubble.style.opacity = "0.6";
+
+    const face = turnedFaceFor(ability);
+    const dir = ability.dir;
+    scene.animateTurn(face, dir, 500, () => {
+      const next = applyAbility(game.board, ability);
+      applyAndSync(next);
+      isAnimating = false;
+      bubble.style.pointerEvents = "auto";
+      bubble.style.opacity = "1";
+    });
+  }
+
   if (isBQ) {
     bubble.appendChild(
-      bubbleButton("Face CW", iconFace() + iconArrow(true), () => applyAndSync(applyAbility(game.board, { kind: "FaceTurn", from: selection!, dir: "CW" }))),
+      bubbleButton("Face CW", iconFace() + iconArrow(true), () =>
+        applyAbilityAnimated({ kind: "FaceTurn", from: selection!, dir: "CW" }),
+      ),
     );
     bubble.appendChild(
-      bubbleButton("Face CCW", iconFace() + iconArrow(false), () => applyAndSync(applyAbility(game.board, { kind: "FaceTurn", from: selection!, dir: "CCW" }))),
+      bubbleButton("Face CCW", iconFace() + iconArrow(false), () =>
+        applyAbilityAnimated({ kind: "FaceTurn", from: selection!, dir: "CCW" }),
+      ),
     );
   }
 
   if (isRQ) {
     bubble.appendChild(
-      bubbleButton("Row CW", iconRow() + iconArrow(true), () => applyAndSync(applyAbility(game.board, { kind: "LayerTurn", from: selection!, axis: "row", dir: "CW" }))),
+      bubbleButton("Row CW", iconRow() + iconArrow(true), () =>
+        applyAbilityAnimated({ kind: "LayerTurn", from: selection!, axis: "row", dir: "CW" }),
+      ),
     );
     bubble.appendChild(
-      bubbleButton("Row CCW", iconRow() + iconArrow(false), () => applyAndSync(applyAbility(game.board, { kind: "LayerTurn", from: selection!, axis: "row", dir: "CCW" }))),
+      bubbleButton("Row CCW", iconRow() + iconArrow(false), () =>
+        applyAbilityAnimated({ kind: "LayerTurn", from: selection!, axis: "row", dir: "CCW" }),
+      ),
     );
     bubble.appendChild(
-      bubbleButton("Col CW", iconCol() + iconArrow(true), () => applyAndSync(applyAbility(game.board, { kind: "LayerTurn", from: selection!, axis: "col", dir: "CW" }))),
+      bubbleButton("Col CW", iconCol() + iconArrow(true), () =>
+        applyAbilityAnimated({ kind: "LayerTurn", from: selection!, axis: "col", dir: "CW" }),
+      ),
     );
     bubble.appendChild(
-      bubbleButton("Col CCW", iconCol() + iconArrow(false), () => applyAndSync(applyAbility(game.board, { kind: "LayerTurn", from: selection!, axis: "col", dir: "CCW" }))),
+      bubbleButton("Col CCW", iconCol() + iconArrow(false), () =>
+        applyAbilityAnimated({ kind: "LayerTurn", from: selection!, axis: "col", dir: "CCW" }),
+      ),
     );
   }
 
@@ -188,6 +230,7 @@ function isSamePos(a: Pos, b: Pos): boolean {
 
 const scene = createScene(viewport, () => game.board, {
   onTileClick: (pos) => {
+    if (isAnimating) return;
     const board = game.board;
     const clickedPiece = getPiece(board, pos);
 
@@ -271,6 +314,28 @@ const hud = bindHud({
   },
   getSelectionMoves: () => selectionMoves,
   snapTo: (preset) => scene.snapTo(preset),
+  applyAbilityAnimated: (ability) => {
+    if (!selection) return;
+    // Reuse bubble logic for turned face + animation.
+    const face =
+      ability.kind === "FaceTurn"
+        ? ability.from.face
+        : ability.axis === "row"
+          ? step(ability.from, ability.from.r === 0 ? "N" : "S").to.face
+          : step(ability.from, ability.from.c === 0 ? "W" : "E").to.face;
+
+    if (isAnimating) return;
+    isAnimating = true;
+    scene.animateTurn(face, ability.dir, 500, () => {
+      const next = applyAbility(game.board, ability);
+      game = { board: next };
+      selectionMoves = selection ? legalMoves(game.board, selection) : [];
+      scene.setHighlights(selectionMoves);
+      scene.sync();
+      hud.sync();
+      isAnimating = false;
+    });
+  },
 });
 
 scene.sync();
