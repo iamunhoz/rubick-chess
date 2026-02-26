@@ -138,13 +138,20 @@ export function turnFace(board: Board, face: Face, dir: TurnDir): Board {
     moves.set(`${from.face}:${from.r}:${from.c}`, to);
   }
 
-  let next = board;
+  const moved: Array<{ to: Pos; piece: NonNullable<ReturnType<typeof getPiece>> }> = [];
   for (const from of affected) {
     const piece = getPiece(board, from);
     if (piece === null) continue;
     const to = moves.get(`${from.face}:${from.r}:${from.c}`);
     if (!to) continue;
+    moved.push({ to, piece });
+  }
+
+  let next = board;
+  for (const from of affected) {
     next = setPiece(next, from, null);
+  }
+  for (const { to, piece } of moved) {
     next = setPiece(next, to, piece);
   }
   return next;

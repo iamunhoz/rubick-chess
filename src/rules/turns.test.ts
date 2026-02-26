@@ -60,4 +60,30 @@ describe("turns.turnFace", () => {
     expect(getPiece(t4, { face: "U", r: 3, c: 3 })?.id).toBe("b");
     expect(getPiece(t4, { face: "L", r: 0, c: 1 })?.id).toBe("c");
   });
+
+  it("preserves piece count on a fully populated board", () => {
+    let board = createEmptyBoard();
+    const faces: Face[] = ["U", "D", "F", "B", "L", "R"];
+    for (const face of faces) {
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          const pos: Pos = { face, r: r as Pos["r"], c: c as Pos["c"] };
+          const id = `${face}:${r}:${c}`;
+          board = setPiece(board, pos, { id, color: "W", kind: "P" });
+        }
+      }
+    }
+
+    const turned = turnFace(board, "F", "CW");
+    let count = 0;
+    for (const face of faces) {
+      for (let r = 0; r < 4; r++) {
+        for (let c = 0; c < 4; c++) {
+          const pos: Pos = { face, r: r as Pos["r"], c: c as Pos["c"] };
+          if (getPiece(turned, pos)) count++;
+        }
+      }
+    }
+    expect(count).toBe(96);
+  });
 });
