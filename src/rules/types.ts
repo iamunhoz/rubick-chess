@@ -17,5 +17,5 @@ export type Piece = {
   color: Color;
   kind: PieceKind;
   facesCrossed?: number;
+  forwardDir?: Dir;
 };
-

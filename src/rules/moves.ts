@@ -57,7 +57,8 @@ function slide(
   return moves;
 }
 
-function pawnForwardDir(_color: Color): Dir {
+function pawnForwardDir(_color: Color, piece?: Piece): Dir {
+  if (piece?.forwardDir) return piece.forwardDir;
   // MVP: allow pawns to move immediately off their starting face edge (row 3).
   // We’ll revisit per-color orientation when we add turns/check rules.
   return "S";
@@ -125,7 +126,7 @@ export function legalMoves(board: Board, from: Pos): Pos[] {
   }
 
   if (piece.kind === "P") {
-    const forwardDir = pawnForwardDir(piece.color);
+    const forwardDir = pawnForwardDir(piece.color, piece);
     const forward = step(from, forwardDir).to;
     if (getPiece(board, forward) === null) pushUnique(result, forward);
 
@@ -141,4 +142,3 @@ export function legalMoves(board: Board, from: Pos): Pos[] {
 
   return result;
 }
-
