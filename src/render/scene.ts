@@ -4,7 +4,7 @@ import type { Board } from "../rules/board";
 import { getPiece } from "../rules/board";
 import type { Face, Pos } from "../rules/types";
 import { createCameraRig, type SnapPreset } from "./camera";
-import { getPieceModel } from "./pieces";
+import { createPieceOutline, getPieceModel } from "./pieces";
 
 type SceneApi = {
   sync: () => void;
@@ -111,6 +111,7 @@ export function createScene(
   root.add(piecesGroup);
 
   const pieceMeshes = new Map<string, any>();
+  const outlineMeshes = new Map<string, any>();
 
   function quatFromUpToNormal(normal: any): any {
     const up = new THREE.Vector3(0, 1, 0);
@@ -162,6 +163,16 @@ export function createScene(
       let model = pieceMeshes.get(key);
       if (!model) {
         model = getPieceModel(piece.kind, piece.color);
+        model.userData = { pieceKey: key };
+        model.traverse((obj: any) => {
+          if (obj?.isMesh) obj.userData = { pieceKey: key };
+        });
+
+        const outline = createPieceOutline(model, 0x2f8cff);
+        outline.userData = { pieceKey: key };
+        outlineMeshes.set(key, outline);
+        piecesGroup.add(outline);
+
         piecesGroup.add(model);
         pieceMeshes.set(key, model);
       }
@@ -172,12 +183,21 @@ export function createScene(
       model.position.copy(position.clone().add(normal.clone().multiplyScalar(0.52)));
       model.quaternion.copy(quatFromUpToNormal(normal));
       model.userData = { label: pieceLabel(piece.kind, piece.color) };
+
+      const outline = outlineMeshes.get(key);
+      if (outline) {
+        outline.position.copy(model.position);
+        outline.quaternion.copy(model.quaternion);
+      }
     }
 
     for (const [key, model] of pieceMeshes.entries()) {
       if (present.has(key)) continue;
       piecesGroup.remove(model);
       pieceMeshes.delete(key);
+      const outline = outlineMeshes.get(key);
+      if (outline) piecesGroup.remove(outline);
+      outlineMeshes.delete(key);
     }
   }
 
@@ -196,6 +216,42 @@ export function createScene(
   // Basic click-to-log selection hook (wiring to rules comes later).
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
+
+  let hoveredPieceKey: string | null = null;
+  function setHoveredPiece(key: string | null): void {
+    if (hoveredPieceKey === key) return;
+    hoveredPieceKey = key;
+    for (const [k, outline] of outlineMeshes.entries()) {
+      outline.visible = k === hoveredPieceKey;
+    }
+  }
+
+  function keyFromIntersectedObject(obj: any): string | null {
+    let cur: any = obj;
+    while (cur) {
+      const key = cur?.userData?.pieceKey;
+      if (typeof key === "string") return key;
+      cur = cur.parent;
+    }
+    return null;
+  }
+
+  renderer.domElement.addEventListener("pointermove", (ev: PointerEvent) => {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
+    raycaster.setFromCamera(pointer, camera);
+
+    const pieceObjects = Array.from(pieceMeshes.values());
+    const hits = raycaster.intersectObjects(pieceObjects, true);
+    if (hits.length === 0) {
+      setHoveredPiece(null);
+      return;
+    }
+    const key = keyFromIntersectedObject(hits[0]?.object);
+    setHoveredPiece(key);
+  });
+
   renderer.domElement.addEventListener("pointerdown", (ev: PointerEvent) => {
     const rect = renderer.domElement.getBoundingClientRect();
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;

@@ -188,3 +188,25 @@ export function getPieceModel(kind: PieceKind, color: Color): any {
   return proto.clone(true);
 }
 
+export function createPieceOutline(model: any, color = 0x2f8cff): any {
+  const outline = model.clone(true);
+  outline.scale.multiplyScalar(1.06);
+
+  outline.traverse((obj: any) => {
+    if (!obj?.isMesh) return;
+    obj.material = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 1.0,
+      roughness: 1.0,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+    });
+    obj.renderOrder = 2;
+  });
+
+  outline.visible = false;
+  return outline;
+}
