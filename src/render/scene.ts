@@ -61,7 +61,7 @@ function pieceLabel(kind: string, color: string): string {
 export function createScene(
   container: HTMLElement,
   getBoard: () => Board,
-  opts?: { onTileClick?: (pos: Pos) => void },
+  opts?: { onTileClick?: (pos: Pos) => void; onEmptyClick?: () => void },
 ): SceneApi {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.max(1, window.devicePixelRatio || 1));
@@ -315,7 +315,10 @@ export function createScene(
     }
 
     const hits = raycaster.intersectObjects([...tiles.values()], false);
-    if (hits.length === 0) return;
+    if (hits.length === 0) {
+      opts?.onEmptyClick?.();
+      return;
+    }
     const mesh = hits[0]?.object as any;
     const entry = [...tiles.entries()].find(([, m]) => m === mesh);
     if (!entry) return;

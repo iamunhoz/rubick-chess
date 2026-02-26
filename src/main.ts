@@ -263,6 +263,15 @@ const scene = createScene(viewport, () => game.board, {
     hud.sync();
     rebuildBubble();
   },
+  onEmptyClick: () => {
+    if (isAnimating) return;
+    selection = null;
+    selectionMoves = [];
+    scene.setSelected(null);
+    scene.setHighlights([]);
+    hud.sync();
+    rebuildBubble();
+  },
 });
 
 window.addEventListener("keydown", (ev) => {
