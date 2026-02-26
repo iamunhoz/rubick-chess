@@ -257,6 +257,20 @@ export function createScene(
     pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
     pointer.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
     raycaster.setFromCamera(pointer, camera);
+
+    // Prefer selecting a piece directly.
+    const pieceRoots = [...pieceMeshes.values(), ...outlineMeshes.values()];
+    const pieceHits = raycaster.intersectObjects(pieceRoots, true);
+    if (pieceHits.length > 0) {
+      const key = keyFromIntersectedObject(pieceHits[0]?.object);
+      if (key) {
+        const [face, r, c] = key.split(":");
+        const pos: Pos = { face: face as Face, r: Number(r) as Pos["r"], c: Number(c) as Pos["c"] };
+        opts?.onTileClick?.(pos);
+        return;
+      }
+    }
+
     const hits = raycaster.intersectObjects([...tiles.values()], false);
     if (hits.length === 0) return;
     const mesh = hits[0]?.object as any;
