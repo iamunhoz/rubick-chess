@@ -1,6 +1,7 @@
 import { applyAbility } from "../rules/abilities";
 import type { Board } from "../rules/board";
 import type { Pos } from "../rules/types";
+import type { SnapPreset } from "../render/camera";
 
 type HudBindings = {
   getBoard: () => Board;
@@ -8,6 +9,7 @@ type HudBindings = {
   getSelection: () => Pos | null;
   setSelection: (pos: Pos | null) => void;
   getSelectionMoves: () => Pos[];
+  snapTo: (preset: SnapPreset) => void;
 };
 
 type HudApi = { sync: () => void };
@@ -36,6 +38,33 @@ export function bindHud(bindings: HudBindings): HudApi {
     bindings.setSelection(null);
     window.location.reload(); // MVP reset: simple and reliable
   });
+
+  const snapButtons = [
+    ["Front", "F"],
+    ["Back", "B"],
+    ["Left", "L"],
+    ["Right", "R"],
+    ["Top", "U"],
+    ["Bottom", "D"],
+    ["Iso", "I"],
+  ] as const;
+
+  const row = document.createElement("div");
+  row.className = "hud-row";
+  for (const [label, preset] of snapButtons) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.addEventListener("click", () => bindings.snapTo(preset));
+    row.appendChild(btn);
+  }
+  const title = document.createElement("div");
+  title.className = "hud-title";
+  title.textContent = "Camera";
+  const hud = document.querySelector<HTMLElement>("#hud");
+  if (!hud) throw new Error("#hud missing");
+  hud.appendChild(title);
+  hud.appendChild(row);
 
   btnApply.addEventListener("click", () => {
     const from = bindings.getSelection();

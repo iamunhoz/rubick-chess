@@ -80,6 +80,17 @@ const scene = createScene(viewport, () => game.board, {
   },
 });
 
+window.addEventListener("keydown", (ev) => {
+  const k = ev.key.toLowerCase();
+  if (k === "f") scene.snapTo("F");
+  if (k === "b") scene.snapTo("B");
+  if (k === "l") scene.snapTo("L");
+  if (k === "r") scene.snapTo("R");
+  if (k === "u") scene.snapTo("U");
+  if (k === "d") scene.snapTo("D");
+  if (k === "i") scene.snapTo("I");
+});
+
 const hud = bindHud({
   getBoard: () => game.board,
   setBoard: (b) => {
@@ -97,6 +108,7 @@ const hud = bindHud({
     scene.setHighlights(selectionMoves);
   },
   getSelectionMoves: () => selectionMoves,
+  snapTo: (preset) => scene.snapTo(preset),
 });
 
 scene.sync();

@@ -3,11 +3,13 @@ import * as THREE from "three";
 import type { Board } from "../rules/board";
 import { getPiece } from "../rules/board";
 import type { Face, Pos } from "../rules/types";
+import { createCameraRig, type SnapPreset } from "./camera";
 
 type SceneApi = {
   sync: () => void;
   setSelected: (pos: Pos | null) => void;
   setHighlights: (positions: Pos[]) => void;
+  snapTo: (preset: SnapPreset) => void;
 };
 
 const faces: Face[] = ["U", "D", "F", "B", "L", "R"];
@@ -67,9 +69,8 @@ export function createScene(
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b0f17);
 
-  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
-  camera.position.set(7, 6, 7);
-  camera.lookAt(0, 0, 0);
+  const rig = createCameraRig(renderer.domElement, { w: container.clientWidth, h: container.clientHeight });
+  const camera = rig.camera;
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.7);
   scene.add(ambient);
@@ -177,6 +178,7 @@ export function createScene(
 
   function animate(): void {
     resizeIfNeeded();
+    rig.controls.update();
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
   }
@@ -210,5 +212,5 @@ export function createScene(
   animate();
 
   refreshTileColors();
-  return { sync, setSelected, setHighlights };
+  return { sync, setSelected, setHighlights, snapTo: rig.snapTo };
 }
