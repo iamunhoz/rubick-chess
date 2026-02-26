@@ -11,6 +11,8 @@ type SceneApi = {
   setSelected: (pos: Pos | null) => void;
   setHighlights: (positions: Pos[]) => void;
   snapTo: (preset: SnapPreset) => void;
+  projectToScreen: (world: any) => { x: number; y: number; z: number };
+  getPieceAnchorWorld: (pos: Pos) => any;
 };
 
 const faces: Face[] = ["U", "D", "F", "B", "L", "R"];
@@ -72,6 +74,22 @@ export function createScene(
 
   const rig = createCameraRig(renderer.domElement, { w: container.clientWidth, h: container.clientHeight });
   const camera = rig.camera;
+
+  function getPieceAnchorWorld(pos: Pos): any {
+    const { position, normal } = posToWorld(pos);
+    return position.clone().add(normal.clone().multiplyScalar(0.75));
+  }
+
+  function projectToScreen(world: any): { x: number; y: number; z: number } {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    const v = world.clone().project(camera);
+    return {
+      x: (v.x * 0.5 + 0.5) * w,
+      y: (-v.y * 0.5 + 0.5) * h,
+      z: v.z,
+    };
+  }
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.7);
   scene.add(ambient);
@@ -307,5 +325,5 @@ export function createScene(
   animate();
 
   refreshTileColors();
-  return { sync, setSelected, setHighlights, snapTo: rig.snapTo };
+  return { sync, setSelected, setHighlights, snapTo: rig.snapTo, projectToScreen, getPieceAnchorWorld };
 }
