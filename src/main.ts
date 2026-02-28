@@ -14,6 +14,11 @@ import type { Ability } from "./rules/abilities";
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("#app not found");
 
+const versionMeta = document.createElement("meta");
+versionMeta.name = "rubicks-chess-version";
+versionMeta.content = typeof __BUILD_VERSION__ === "string" ? __BUILD_VERSION__ : "unknown";
+document.head.appendChild(versionMeta);
+
 app.innerHTML = `
   <div id="viewport"></div>
   <aside id="hud">
