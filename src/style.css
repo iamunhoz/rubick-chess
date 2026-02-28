@@ -41,9 +41,42 @@ h1 {
   height: 100vh;
 }
 
+#app[data-hud="hidden"] {
+  grid-template-columns: 1fr;
+}
+
+#app[data-hud="hidden"] #hud {
+  display: none;
+}
+
 #viewport {
   position: relative;
   overflow: hidden;
+}
+
+#hudToggle {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 16px;
+  background: rgba(11, 15, 23, 0.75);
+  color: #f0f2f7;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+#hudToggle svg {
+  width: 14px;
+  height: 14px;
 }
 
 #hud {

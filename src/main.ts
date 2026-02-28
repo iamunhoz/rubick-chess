@@ -39,6 +39,8 @@ app.innerHTML = `
   </aside>
 `;
 
+app.dataset.hud = "hidden";
+
 let game = createInitialGame();
 let selection: Pos | null = null;
 let selectionMoves: Pos[] = [];
@@ -46,6 +48,25 @@ let isAnimating = false;
 
 const viewport = document.querySelector<HTMLDivElement>("#viewport");
 if (!viewport) throw new Error("#viewport not found");
+
+const hudToggle = document.createElement("button");
+hudToggle.id = "hudToggle";
+hudToggle.type = "button";
+viewport.appendChild(hudToggle);
+
+let hudVisible = false;
+function syncHudVisibility(): void {
+  app.dataset.hud = hudVisible ? "visible" : "hidden";
+  hudToggle.textContent = hudVisible ? "Hide Menu" : "Show Menu";
+  hudToggle.setAttribute("aria-pressed", hudVisible ? "true" : "false");
+}
+
+hudToggle.addEventListener("click", () => {
+  hudVisible = !hudVisible;
+  syncHudVisibility();
+});
+
+syncHudVisibility();
 
 const overlay = document.createElement("div");
 overlay.id = "overlay";
