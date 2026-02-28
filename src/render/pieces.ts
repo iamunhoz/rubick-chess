@@ -22,8 +22,8 @@ export function heightScaleFor(kind: PieceKind): number {
 }
 
 function palette(color: Color): { base: number; body: number } {
-  if (color === "W") return { base: 0xb9c4d8, body: 0xe7eefc };
-  return { base: 0x0b0f17, body: 0x1f2432 };
+  if (color === "W") return { base: 0xe6ecf7, body: 0xfafcff };
+  return { base: 0x2d3445, body: 0x434b61 };
 }
 
 function box(w: number, h: number, d: number, mat: any): any {

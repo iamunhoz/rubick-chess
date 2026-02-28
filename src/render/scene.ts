@@ -20,6 +20,58 @@ const faces: Face[] = ["U", "D", "F", "B", "L", "R"];
 const TILE_SIZE = 1;
 const HALF = 2;
 
+type SkyAnimator = { texture: THREE.CanvasTexture; update: (deltaSec: number) => void };
+
+function createSkyAnimator(): SkyAnimator | null {
+  const canvas = document.createElement("canvas");
+  canvas.width = 768;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  let offset = 0;
+
+  function draw(): void {
+    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    grad.addColorStop(0, "#e2f1ff");
+    grad.addColorStop(0.6, "#b7dcff");
+    grad.addColorStop(1, "#8ec4ff");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const cloudWidth = 180;
+    const cloudHeight = 70;
+    const cloudCount = 6;
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    for (let i = 0; i < cloudCount; i++) {
+      const baseX = ((i / cloudCount) * canvas.width + offset) % (canvas.width + cloudWidth) - cloudWidth;
+      const baseY = canvas.height * (0.2 + 0.15 * Math.sin(i * 1.3));
+      drawCloud(ctx, baseX, baseY, cloudWidth, cloudHeight);
+    }
+
+    texture.needsUpdate = true;
+  }
+
+  function drawCloud(context: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+    context.beginPath();
+    context.ellipse(x, y, w * 0.35, h * 0.35, 0, 0, Math.PI * 2);
+    context.ellipse(x + w * 0.3, y - h * 0.2, w * 0.45, h * 0.4, 0, 0, Math.PI * 2);
+    context.ellipse(x + w * 0.65, y - h * 0.05, w * 0.4, h * 0.35, 0, 0, Math.PI * 2);
+    context.ellipse(x + w * 0.4, y + h * 0.1, w * 0.5, h * 0.28, 0, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  function update(deltaSec: number): void {
+    offset = (offset + deltaSec * 60) % (canvas.width + 180);
+    draw();
+  }
+
+  draw();
+  return { texture, update };
+}
+
 function posKey(pos: Pos): string {
   return `${pos.face}:${pos.r}:${pos.c}`;
 }
@@ -71,21 +123,11 @@ export function createScene(
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const gradientCanvas = document.createElement("canvas");
-  gradientCanvas.width = 2;
-  gradientCanvas.height = 256;
-  const gctx = gradientCanvas.getContext("2d");
-  if (gctx) {
-    const grad = gctx.createLinearGradient(0, 0, 0, gradientCanvas.height);
-    grad.addColorStop(0, "#6f778a");
-    grad.addColorStop(1, "#2f3547");
-    gctx.fillStyle = grad;
-    gctx.fillRect(0, 0, gradientCanvas.width, gradientCanvas.height);
-    const tex = new THREE.CanvasTexture(gradientCanvas);
-    tex.needsUpdate = true;
-    scene.background = tex;
+  const sky = createSkyAnimator();
+  if (sky) {
+    scene.background = sky.texture;
   } else {
-    scene.background = new THREE.Color(0x2f3547);
+    scene.background = new THREE.Color(0xaed6ff);
   }
 
   const rig = createCameraRig(renderer.domElement, { w: container.clientWidth, h: container.clientHeight });
@@ -264,7 +306,14 @@ export function createScene(
     }
   }
 
-  function animate(): void {
+  let lastFrameTime: number | null = null;
+  function animate(now?: number): void {
+    if (typeof now === "number") {
+      if (lastFrameTime === null) lastFrameTime = now;
+      const delta = (now - lastFrameTime) / 1000;
+      if (sky) sky.update(delta);
+      lastFrameTime = now;
+    }
     resizeIfNeeded();
     rig.controls.update();
     renderer.render(scene, camera);
@@ -448,7 +497,7 @@ export function createScene(
     requestAnimationFrame(tick);
   }
 
-  animate();
+  requestAnimationFrame(animate);
 
   refreshTileColors();
   return { sync, setSelected, setHighlights, snapTo: rig.snapTo, projectToScreen, getPieceAnchorWorld, animateTurn };
