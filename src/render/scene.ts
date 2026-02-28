@@ -132,8 +132,8 @@ export function createScene(
 
   const tiles = new Map<string, any>();
   const tileGeom = new THREE.PlaneGeometry(TILE_SIZE * 0.95, TILE_SIZE * 0.95);
-  const baseA = 0x2c3242;
-  const baseB = 0x1f2432;
+  const baseA = 0xf0f2f7;
+  const baseB = 0x1a1d28;
   const highlightColor = 0x2f8cff;
   const moveColor = 0x2fe58c;
 
@@ -143,7 +143,7 @@ export function createScene(
     const mat = new THREE.MeshStandardMaterial({
       color: base,
       emissive: 0x000000,
-      emissiveIntensity: 0.9,
+      emissiveIntensity: 0.45,
       roughness: 0.95,
       metalness: 0.0,
     });
