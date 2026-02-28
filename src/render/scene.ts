@@ -116,6 +116,20 @@ export function createScene(
   const root = new THREE.Group();
   scene.add(root);
 
+  const occluderSize = TILE_SIZE * 4 - 0.2;
+  const occluder = new THREE.Mesh(
+    new THREE.BoxGeometry(occluderSize, occluderSize, occluderSize),
+    new THREE.MeshStandardMaterial({
+      color: 0x1a1c24,
+      roughness: 1,
+      metalness: 0,
+      transparent: false,
+    }),
+  );
+  occluder.receiveShadow = false;
+  occluder.castShadow = false;
+  root.add(occluder);
+
   const tiles = new Map<string, any>();
   const tileGeom = new THREE.PlaneGeometry(TILE_SIZE * 0.95, TILE_SIZE * 0.95);
   const baseA = 0x2c3242;
