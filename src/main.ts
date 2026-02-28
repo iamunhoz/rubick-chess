@@ -14,6 +14,11 @@ import type { Ability } from "./rules/abilities";
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("#app not found");
 
+const versionMeta = document.createElement("meta");
+versionMeta.name = "rubicks-chess-version";
+versionMeta.content = typeof __BUILD_VERSION__ === "string" ? __BUILD_VERSION__ : "unknown";
+document.head.appendChild(versionMeta);
+
 app.innerHTML = `
   <div id="viewport"></div>
   <aside id="hud">
@@ -39,6 +44,8 @@ app.innerHTML = `
   </aside>
 `;
 
+app.dataset.hud = "hidden";
+
 let game = createInitialGame();
 let selection: Pos | null = null;
 let selectionMoves: Pos[] = [];
@@ -46,6 +53,25 @@ let isAnimating = false;
 
 const viewport = document.querySelector<HTMLDivElement>("#viewport");
 if (!viewport) throw new Error("#viewport not found");
+
+const hudToggle = document.createElement("button");
+hudToggle.id = "hudToggle";
+hudToggle.type = "button";
+viewport.appendChild(hudToggle);
+
+let hudVisible = false;
+function syncHudVisibility(): void {
+  app.dataset.hud = hudVisible ? "visible" : "hidden";
+  hudToggle.textContent = hudVisible ? "Hide Menu" : "Show Menu";
+  hudToggle.setAttribute("aria-pressed", hudVisible ? "true" : "false");
+}
+
+hudToggle.addEventListener("click", () => {
+  hudVisible = !hudVisible;
+  syncHudVisibility();
+});
+
+syncHudVisibility();
 
 const overlay = document.createElement("div");
 overlay.id = "overlay";
