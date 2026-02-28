@@ -11,8 +11,9 @@ import { bindHud } from "./ui/hud";
 import type { Pos } from "./rules/types";
 import type { Ability } from "./rules/abilities";
 
-const app = document.querySelector<HTMLDivElement>("#app");
-if (!app) throw new Error("#app not found");
+const appElement = document.querySelector<HTMLDivElement>("#app");
+if (!appElement) throw new Error("#app not found");
+const app: HTMLDivElement = appElement;
 
 const versionMeta = document.createElement("meta");
 versionMeta.name = "rubicks-chess-version";

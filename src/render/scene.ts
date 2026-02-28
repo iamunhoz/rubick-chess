@@ -20,7 +20,7 @@ const faces: Face[] = ["U", "D", "F", "B", "L", "R"];
 const TILE_SIZE = 1;
 const HALF = 2;
 
-type SkyAnimator = { texture: THREE.CanvasTexture; update: (deltaSec: number) => void };
+type SkyAnimator = { texture: InstanceType<typeof THREE.CanvasTexture>; update: (deltaSec: number) => void };
 
 function createSkyAnimator(): SkyAnimator | null {
   const canvas = document.createElement("canvas");
@@ -28,27 +28,28 @@ function createSkyAnimator(): SkyAnimator | null {
   canvas.height = 256;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
+  const ctxSafe = ctx;
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   let offset = 0;
 
   function draw(): void {
-    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    const grad = ctxSafe.createLinearGradient(0, 0, 0, canvas.height);
     grad.addColorStop(0, "#e2f1ff");
     grad.addColorStop(0.6, "#b7dcff");
     grad.addColorStop(1, "#8ec4ff");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctxSafe.fillStyle = grad;
+    ctxSafe.fillRect(0, 0, canvas.width, canvas.height);
 
     const cloudWidth = 180;
     const cloudHeight = 70;
     const cloudCount = 6;
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctxSafe.fillStyle = "rgba(255,255,255,0.85)";
     for (let i = 0; i < cloudCount; i++) {
       const baseX = ((i / cloudCount) * canvas.width + offset) % (canvas.width + cloudWidth) - cloudWidth;
       const baseY = canvas.height * (0.2 + 0.15 * Math.sin(i * 1.3));
-      drawCloud(ctx, baseX, baseY, cloudWidth, cloudHeight);
+      drawCloud(ctxSafe, baseX, baseY, cloudWidth, cloudHeight);
     }
 
     texture.needsUpdate = true;
