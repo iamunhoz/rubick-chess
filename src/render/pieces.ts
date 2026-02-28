@@ -1,12 +1,21 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 import type { Color, PieceKind } from "../rules/types";
 
+type PieceMap = Record<PieceKind, THREE.Mesh>;
 type ModelKey = `${Color}:${PieceKind}`;
 
-const cache = new Map<ModelKey, any>();
+type MeshVisitor = (mesh: THREE.Mesh) => void;
 
-const voxel = 0.16;
+const loader = new GLTFLoader();
+const glbUrl = new URL("../../assets/Chess.glb", import.meta.url).href;
+
+const modelCache = new Map<ModelKey, THREE.Object3D>();
+let preloadPromise: Promise<void> | null = null;
+
+const KIND_ORDER: readonly PieceKind[] = ["P", "N", "B", "R", "Q", "K"] as const;
 
 const heightScaleByKind: Record<PieceKind, number> = {
   Q: 1.0,
@@ -21,195 +30,190 @@ export function heightScaleFor(kind: PieceKind): number {
   return heightScaleByKind[kind] ?? 1.0;
 }
 
-function palette(color: Color): { base: number; body: number } {
-  if (color === "W") return { base: 0xe6ecf7, body: 0xfafcff };
-  return { base: 0x2d3445, body: 0x434b61 };
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
 }
 
-function box(w: number, h: number, d: number, mat: any): any {
-  const geom = new THREE.BoxGeometry(w, h, d);
-  return new THREE.Mesh(geom, mat);
-}
-
-function layer(
-  group: any,
-  y: number,
-  cells: Array<[number, number]>,
-  mat: any,
-  size = voxel,
-): void {
-  for (const [cx, cz] of cells) {
-    const m = box(size, voxel, size, mat);
-    m.position.set(cx * size, y, cz * size);
-    group.add(m);
-  }
-}
-
-function core(
-  group: any,
-  y0: number,
-  height: number,
-  radius: number,
-  mat: any,
-): void {
-  for (let i = 0; i < height; i++) {
-    const y = y0 + i * voxel;
-    const r = Math.max(1, radius - Math.floor(i / 2));
-    const cells: Array<[number, number]> = [];
-    for (let x = -r; x <= r; x++) {
-      for (let z = -r; z <= r; z++) {
-        if (Math.abs(x) + Math.abs(z) <= r + 1) cells.push([x, z]);
-      }
-    }
-    layer(group, y, cells, mat);
-  }
-}
-
-function buildPawn(baseMat: any, bodyMat: any): any {
-  const g = new THREE.Group();
-  core(g, 0, 2, 2, baseMat);
-  core(g, 2 * voxel, 3, 1, bodyMat);
-  layer(g, 5 * voxel, [[0, 0]], bodyMat);
-  return g;
-}
-
-function buildRook(baseMat: any, bodyMat: any): any {
-  const g = new THREE.Group();
-  core(g, 0, 2, 2, baseMat);
-  core(g, 2 * voxel, 4, 2, bodyMat);
-  // Crenellations
-  layer(
-    g,
-    6 * voxel,
-    [
-      [-2, -2],
-      [-2, 2],
-      [2, -2],
-      [2, 2],
-    ],
-    bodyMat,
-    voxel,
-  );
-  return g;
-}
-
-function buildBishop(baseMat: any, bodyMat: any): any {
-  const g = new THREE.Group();
-  core(g, 0, 2, 2, baseMat);
-  core(g, 2 * voxel, 4, 1, bodyMat);
-  layer(g, 6 * voxel, [[0, 0]], bodyMat);
-  layer(g, 7 * voxel, [[0, 0]], bodyMat);
-  return g;
-}
-
-function buildKnight(baseMat: any, bodyMat: any): any {
-  const g = new THREE.Group();
-  core(g, 0, 2, 2, baseMat);
-  core(g, 2 * voxel, 3, 2, bodyMat);
-  // Head / snout offset forward (+Z)
-  layer(g, 5 * voxel, [[0, 1]], bodyMat);
-  layer(g, 6 * voxel, [[0, 1]], bodyMat);
-  layer(g, 6 * voxel, [[0, 2]], bodyMat);
-  return g;
-}
-
-function buildQueen(baseMat: any, bodyMat: any): any {
-  const g = new THREE.Group();
-  core(g, 0, 2, 2, baseMat);
-  core(g, 2 * voxel, 5, 2, bodyMat);
-  // Crown hints
-  layer(
-    g,
-    7 * voxel,
-    [
-      [-2, 0],
-      [2, 0],
-      [0, -2],
-      [0, 2],
-    ],
-    bodyMat,
-  );
-  layer(g, 8 * voxel, [[0, 0]], bodyMat);
-  return g;
-}
-
-function buildKing(baseMat: any, bodyMat: any): any {
-  const g = new THREE.Group();
-  core(g, 0, 2, 2, baseMat);
-  core(g, 2 * voxel, 5, 2, bodyMat);
-  // Cross
-  layer(
-    g,
-    7 * voxel,
-    [
-      [0, 0],
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ],
-    bodyMat,
-  );
-  layer(g, 8 * voxel, [[0, 0]], bodyMat);
-  return g;
-}
-
-function build(kind: PieceKind, color: Color): any {
-  const { base, body } = palette(color);
-  const baseMat = new THREE.MeshStandardMaterial({ color: base, roughness: 0.95, metalness: 0 });
-  const bodyMat = new THREE.MeshStandardMaterial({ color: body, roughness: 0.85, metalness: 0 });
-
-  const g =
-    kind === "P"
-      ? buildPawn(baseMat, bodyMat)
-      : kind === "R"
-        ? buildRook(baseMat, bodyMat)
-        : kind === "B"
-          ? buildBishop(baseMat, bodyMat)
-          : kind === "N"
-            ? buildKnight(baseMat, bodyMat)
-            : kind === "Q"
-              ? buildQueen(baseMat, bodyMat)
-              : buildKing(baseMat, bodyMat);
-
-  // Center on origin and lift so bottom touches y=0
-  const bbox = new THREE.Box3().setFromObject(g);
+function meshHeight(mesh: THREE.Mesh): number {
+  const box = new THREE.Box3().setFromObject(mesh);
   const size = new THREE.Vector3();
-  bbox.getSize(size);
+  box.getSize(size);
+  return size.y;
+}
+
+function nameToKind(name: string): PieceKind | null {
+  const normalized = normalizeName(name);
+  if (normalized.includes("pawn")) return "P";
+  if (normalized.includes("rook") || normalized.includes("castle")) return "R";
+  if (normalized.includes("bishop")) return "B";
+  if (normalized.includes("king")) return "K";
+  if (normalized.includes("queen")) return "Q";
+  if (normalized.includes("knight") || normalized.includes("horse")) return "N";
+  return null;
+}
+
+export function assignPieceKinds(candidates: THREE.Mesh[]): PieceMap {
+  const byKind = new Map<PieceKind, THREE.Mesh>();
+  const leftovers: THREE.Mesh[] = [];
+
+  for (const mesh of candidates) {
+    const kind = nameToKind(mesh.name);
+    if (kind && !byKind.has(kind)) {
+      byKind.set(kind, mesh);
+      continue;
+    }
+    leftovers.push(mesh);
+  }
+
+  const unresolvedKinds = KIND_ORDER.filter((kind) => !byKind.has(kind));
+  leftovers.sort((a, b) => meshHeight(a) - meshHeight(b));
+
+  for (let i = 0; i < unresolvedKinds.length && i < leftovers.length; i++) {
+    byKind.set(unresolvedKinds[i], leftovers[i]);
+  }
+
+  for (const kind of KIND_ORDER) {
+    if (!byKind.has(kind)) {
+      throw new Error(`Unable to map GLB mesh to piece kind '${kind}'`);
+    }
+  }
+
+  return {
+    P: byKind.get("P")!,
+    N: byKind.get("N")!,
+    B: byKind.get("B")!,
+    R: byKind.get("R")!,
+    Q: byKind.get("Q")!,
+    K: byKind.get("K")!,
+  };
+}
+
+function cloneMaterial(material: THREE.Material): THREE.Material {
+  return material.clone();
+}
+
+export function createBlackMaterialVariant(material: THREE.Material): THREE.Material {
+  const variant = material.clone();
+
+  if ("color" in variant && variant.color instanceof THREE.Color) {
+    const hsl = { h: 0, s: 0, l: 0 };
+    variant.color.getHSL(hsl);
+    variant.color.setHSL(hsl.h, Math.min(1, hsl.s * 0.75), Math.max(0.08, hsl.l * 0.35));
+  }
+
+  if ("emissive" in variant && variant.emissive instanceof THREE.Color) {
+    variant.emissive.setHex(0x000000);
+  }
+
+  return variant;
+}
+
+function traverseMeshes(root: THREE.Object3D, visit: MeshVisitor): void {
+  root.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) {
+      visit(child as THREE.Mesh);
+    }
+  });
+}
+
+function cloneMeshWithWorldTransform(mesh: THREE.Mesh): THREE.Mesh {
+  mesh.updateWorldMatrix(true, false);
+
+  const clone = mesh.clone();
+  clone.geometry = mesh.geometry.clone();
+  if (Array.isArray(mesh.material)) {
+    clone.material = mesh.material.map((m: THREE.Material) => cloneMaterial(m));
+  } else {
+    clone.material = cloneMaterial(mesh.material as THREE.Material);
+  }
+
+  clone.applyMatrix4(mesh.matrixWorld);
+  return clone;
+}
+
+function normalizePrototypeMesh(mesh: THREE.Mesh, kind: PieceKind, color: Color): THREE.Group {
+  const root = new THREE.Group();
+  const worldMesh = cloneMeshWithWorldTransform(mesh);
+  root.add(worldMesh);
+
+  if (color === "B") {
+    traverseMeshes(root, (child) => {
+      if (Array.isArray(child.material)) {
+        child.material = child.material.map((m: THREE.Material) => createBlackMaterialVariant(m));
+      } else {
+        child.material = createBlackMaterialVariant(child.material as THREE.Material);
+      }
+    });
+  }
+
+  const bbox = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3();
   const center = new THREE.Vector3();
+  bbox.getSize(size);
   bbox.getCenter(center);
-  g.position.sub(center);
-  g.position.y += size.y / 2;
 
-  // Scale to fit inside a tile footprint
+  root.position.sub(center);
+  root.position.y += size.y / 2;
+
   const footprint = Math.max(size.x, size.z);
-  const maxFootprint = 0.72; // tile is ~1, keep margin
+  const maxFootprint = 0.72;
   const s = footprint > 0 ? maxFootprint / footprint : 1;
-  g.scale.setScalar(s);
-  const heightScale = heightScaleFor(kind);
-  g.scale.y *= heightScale;
+  root.scale.setScalar(s);
+  root.scale.y *= heightScaleFor(kind);
 
-  return g;
+  return root;
 }
 
-export function getPieceModel(kind: PieceKind, color: Color): any {
+function cloneModelForUse(proto: THREE.Object3D): THREE.Object3D {
+  const clone = cloneSkinned(proto) as THREE.Object3D;
+  traverseMeshes(clone, (mesh) => {
+    if (Array.isArray(mesh.material)) {
+      mesh.material = mesh.material.map((m: THREE.Material) => m.clone());
+    } else {
+      mesh.material = (mesh.material as THREE.Material).clone();
+    }
+  });
+  return clone;
+}
+
+async function buildModelCache(): Promise<void> {
+  const gltf = await loader.loadAsync(glbUrl);
+  const meshes: THREE.Mesh[] = [];
+  gltf.scene.updateWorldMatrix(true, true);
+  traverseMeshes(gltf.scene, (mesh) => {
+    meshes.push(mesh);
+  });
+
+  const mapped = assignPieceKinds(meshes);
+
+  for (const kind of KIND_ORDER) {
+    modelCache.set(`W:${kind}`, normalizePrototypeMesh(mapped[kind], kind, "W"));
+    modelCache.set(`B:${kind}`, normalizePrototypeMesh(mapped[kind], kind, "B"));
+  }
+}
+
+export function preloadPieceModels(): Promise<void> {
+  if (!preloadPromise) {
+    preloadPromise = buildModelCache();
+  }
+  return preloadPromise;
+}
+
+export function getPieceModel(kind: PieceKind, color: Color): THREE.Object3D {
   const key: ModelKey = `${color}:${kind}`;
-  const proto = cache.get(key) ?? (() => {
-    const created = build(kind, color);
-    cache.set(key, created);
-    return created;
-  })();
-
-  return proto.clone(true);
+  const proto = modelCache.get(key);
+  if (!proto) {
+    throw new Error("Piece models not preloaded. Call preloadPieceModels() before getPieceModel().");
+  }
+  return cloneModelForUse(proto);
 }
 
-export function createPieceOutline(model: any, color = 0x2f8cff): any {
-  const outline = model.clone(true);
+export function createPieceOutline(model: THREE.Object3D, color = 0x2f8cff): THREE.Object3D {
+  const outline = cloneModelForUse(model);
   outline.scale.multiplyScalar(1.06);
 
-  outline.traverse((obj: any) => {
-    if (!obj?.isMesh) return;
-    obj.material = new THREE.MeshStandardMaterial({
+  traverseMeshes(outline, (mesh) => {
+    mesh.material = new THREE.MeshStandardMaterial({
       color,
       emissive: color,
       emissiveIntensity: 1.0,
@@ -219,20 +223,19 @@ export function createPieceOutline(model: any, color = 0x2f8cff): any {
       opacity: 0.9,
       depthWrite: false,
     });
-    obj.renderOrder = 2;
+    mesh.renderOrder = 2;
   });
 
   outline.visible = false;
   return outline;
 }
 
-export function createPieceSilhouette(model: any): any {
-  const silhouette = model.clone(true);
+export function createPieceSilhouette(model: THREE.Object3D): THREE.Object3D {
+  const silhouette = cloneModelForUse(model);
   silhouette.scale.multiplyScalar(1.025);
 
-  silhouette.traverse((obj: any) => {
-    if (!obj?.isMesh) return;
-    obj.material = new THREE.MeshStandardMaterial({
+  traverseMeshes(silhouette, (mesh) => {
+    mesh.material = new THREE.MeshStandardMaterial({
       color: 0x000000,
       emissive: 0x000000,
       emissiveIntensity: 0,
@@ -243,9 +246,14 @@ export function createPieceSilhouette(model: any): any {
       depthWrite: false,
       side: THREE.BackSide,
     });
-    obj.renderOrder = 1;
+    mesh.renderOrder = 1;
   });
 
   silhouette.visible = true;
   return silhouette;
 }
+
+export const __pieceInternals = {
+  assignPieceKinds,
+  createBlackMaterialVariant,
+};

@@ -4,7 +4,12 @@ import type { Board } from "../rules/board";
 import { getPiece } from "../rules/board";
 import type { Face, Pos } from "../rules/types";
 import { createCameraRig, type SnapPreset } from "./camera";
-import { createPieceOutline, createPieceSilhouette, getPieceModel } from "./pieces";
+import {
+  createPieceOutline,
+  createPieceSilhouette,
+  getPieceModel,
+  preloadPieceModels,
+} from "./pieces";
 
 type SceneApi = {
   sync: () => void;
@@ -111,11 +116,11 @@ function pieceLabel(kind: string, color: string): string {
   return `${color}${kind}`;
 }
 
-export function createScene(
+export async function createScene(
   container: HTMLElement,
   getBoard: () => Board,
   opts?: { onTileClick?: (pos: Pos) => void; onEmptyClick?: () => void },
-): SceneApi {
+): Promise<SceneApi> {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.max(1, window.devicePixelRatio || 1));
   renderer.setSize(container.clientWidth, container.clientHeight, false);
@@ -337,6 +342,8 @@ export function createScene(
   let isAnimating = false;
 
   let hoveredPieceKey: string | null = null;
+
+  await preloadPieceModels();
   function setHoveredPiece(key: string | null): void {
     if (hoveredPieceKey === key) return;
     hoveredPieceKey = key;

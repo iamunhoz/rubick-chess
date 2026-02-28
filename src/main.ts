@@ -255,7 +255,7 @@ function isSamePos(a: Pos, b: Pos): boolean {
   return a.face === b.face && a.r === b.r && a.c === b.c;
 }
 
-const scene = createScene(viewport, () => game.board, {
+const scene = await createScene(viewport, () => game.board, {
   onTileClick: (pos) => {
     if (isAnimating) return;
     const board = game.board;
