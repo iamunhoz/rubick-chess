@@ -7,6 +7,8 @@ export type CameraRig = {
   camera: any;
   controls: any;
   snapTo: (preset: SnapPreset) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
   dispose: () => void;
 };
 
@@ -61,9 +63,27 @@ export function createCameraRig(rendererDom: HTMLCanvasElement, initialSize: { w
     controls.update();
   }
 
+  function zoomIn(): void {
+    const target = controls.target.clone();
+    const d = camera.position.distanceTo(target);
+    const next = Math.max(controls.minDistance, d * 0.85);
+    const dir = camera.position.clone().sub(target).normalize();
+    camera.position.copy(target.clone().add(dir.multiplyScalar(next)));
+    controls.update();
+  }
+
+  function zoomOut(): void {
+    const target = controls.target.clone();
+    const d = camera.position.distanceTo(target);
+    const next = Math.min(controls.maxDistance, d * 1.18);
+    const dir = camera.position.clone().sub(target).normalize();
+    camera.position.copy(target.clone().add(dir.multiplyScalar(next)));
+    controls.update();
+  }
+
   function dispose(): void {
     controls.dispose();
   }
 
-  return { camera, controls, snapTo, dispose };
+  return { camera, controls, snapTo, zoomIn, zoomOut, dispose };
 }

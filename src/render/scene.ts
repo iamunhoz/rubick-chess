@@ -15,7 +15,10 @@ type SceneApi = {
   sync: () => void;
   setSelected: (pos: Pos | null) => void;
   setHighlights: (positions: Pos[]) => void;
+  setMoveTarget: (pos: Pos | null) => void;
   snapTo: (preset: SnapPreset) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
   projectToScreen: (world: any) => { x: number; y: number; z: number };
   getPieceAnchorWorld: (pos: Pos) => any;
   animateTurn: (face: Face, dir: "CW" | "CCW", durationMs: number, onDone: () => void) => void;
@@ -219,7 +222,9 @@ export async function createScene(
   }
 
   let selectedKey: string | null = null;
+  let moveTargetKey: string | null = null;
   const highlighted = new Set<string>();
+  const moveTargetColor = 0xffa62f; // orange for keyboard-targeted move
 
   function setSelected(pos: Pos | null): void {
     selectedKey = pos ? posKey(pos) : null;
@@ -229,6 +234,11 @@ export async function createScene(
   function setHighlights(positions: Pos[]): void {
     highlighted.clear();
     for (const p of positions) highlighted.add(posKey(p));
+    refreshTileColors();
+  }
+
+  function setMoveTarget(pos: Pos | null): void {
+    moveTargetKey = pos ? posKey(pos) : null;
     refreshTileColors();
   }
 
@@ -242,6 +252,7 @@ export async function createScene(
       mat.emissive.setHex(isLight ? 0x3a2510 : 0x000000);
       mat.emissiveIntensity = isLight ? 0.12 : 0.0;
       if (highlighted.has(key)) { mat.emissive.setHex(moveColor); mat.emissiveIntensity = 0.45; }
+      if (moveTargetKey === key) { mat.emissive.setHex(moveTargetColor); mat.emissiveIntensity = 0.7; }
       if (selectedKey === key) { mat.emissive.setHex(highlightColor); mat.emissiveIntensity = 0.45; }
     }
   }
@@ -512,5 +523,5 @@ export async function createScene(
   requestAnimationFrame(animate);
 
   refreshTileColors();
-  return { sync, setSelected, setHighlights, snapTo: rig.snapTo, projectToScreen, getPieceAnchorWorld, animateTurn };
+  return { sync, setSelected, setHighlights, setMoveTarget, snapTo: rig.snapTo, zoomIn: rig.zoomIn, zoomOut: rig.zoomOut, projectToScreen, getPieceAnchorWorld, animateTurn };
 }

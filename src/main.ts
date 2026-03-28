@@ -8,6 +8,7 @@ import { applyAbility, isCorner } from "./rules/abilities";
 import { step } from "./rules/topology";
 import { createScene } from "./render/scene";
 import { bindHud } from "./ui/hud";
+import { bindKeyboard } from "./keyboard";
 import type { Pos } from "./rules/types";
 import type { Ability } from "./rules/abilities";
 
@@ -51,6 +52,7 @@ let game = createInitialGame();
 let selection: Pos | null = null;
 let selectionMoves: Pos[] = [];
 let isAnimating = false;
+let moveTargetIndex = -1; // -1 = no keyboard target
 
 const viewport = document.querySelector<HTMLDivElement>("#viewport");
 if (!viewport) throw new Error("#viewport not found");
@@ -255,6 +257,48 @@ function isSamePos(a: Pos, b: Pos): boolean {
   return a.face === b.face && a.r === b.r && a.c === b.c;
 }
 
+/** Get all board positions occupied by pieces, sorted by key for stable ordering. */
+function allPiecePositions(): Pos[] {
+  const positions: Pos[] = [];
+  for (const key of [...game.board.pieces.keys()].sort()) {
+    const [face, r, c] = key.split(":");
+    positions.push({ face: face as Pos["face"], r: Number(r) as Pos["r"], c: Number(c) as Pos["c"] });
+  }
+  return positions;
+}
+
+function clearMoveTarget(): void {
+  moveTargetIndex = -1;
+}
+
+function selectPiece(pos: Pos): void {
+  selection = pos;
+  selectionMoves = legalMoves(game.board, pos);
+  clearMoveTarget();
+  scene.setSelected(pos);
+  scene.setHighlights(selectionMoves);
+  scene.setMoveTarget(null);
+  hud.sync();
+  rebuildBubble();
+}
+
+function deselectAll(): void {
+  selection = null;
+  selectionMoves = [];
+  clearMoveTarget();
+  scene.setSelected(null);
+  scene.setHighlights([]);
+  scene.setMoveTarget(null);
+  hud.sync();
+  rebuildBubble();
+}
+
+function executeMove(from: Pos, to: Pos): void {
+  game = { board: applyMove(game.board, from, to) };
+  deselectAll();
+  scene.sync();
+}
+
 const scene = await createScene(viewport, () => game.board, {
   onTileClick: (pos) => {
     if (isAnimating) return;
@@ -262,54 +306,21 @@ const scene = await createScene(viewport, () => game.board, {
     const clickedPiece = getPiece(board, pos);
 
     if (selection && selectionMoves.some((p) => isSamePos(p, pos))) {
-      game = { board: applyMove(board, selection, pos) };
-      selection = null;
-      selectionMoves = [];
-      scene.setSelected(null);
-      scene.setHighlights([]);
-      scene.sync();
-      hud.sync();
-      rebuildBubble();
+      executeMove(selection, pos);
       return;
     }
 
     if (clickedPiece) {
-      selection = pos;
-      selectionMoves = legalMoves(board, pos);
-      scene.setSelected(pos);
-      scene.setHighlights(selectionMoves);
-      hud.sync();
-      rebuildBubble();
+      selectPiece(pos);
       return;
     }
 
-    selection = null;
-    selectionMoves = [];
-    scene.setSelected(null);
-    scene.setHighlights([]);
-    hud.sync();
-    rebuildBubble();
+    deselectAll();
   },
   onEmptyClick: () => {
     if (isAnimating) return;
-    selection = null;
-    selectionMoves = [];
-    scene.setSelected(null);
-    scene.setHighlights([]);
-    hud.sync();
-    rebuildBubble();
+    deselectAll();
   },
-});
-
-window.addEventListener("keydown", (ev) => {
-  const k = ev.key.toLowerCase();
-  if (k === "f") scene.snapTo("F");
-  if (k === "b") scene.snapTo("B");
-  if (k === "l") scene.snapTo("L");
-  if (k === "r") scene.snapTo("R");
-  if (k === "u") scene.snapTo("U");
-  if (k === "d") scene.snapTo("D");
-  if (k === "i") scene.snapTo("I");
 });
 
 function updateBubblePosition(): void {
@@ -344,15 +355,16 @@ const hud = bindHud({
   setSelection: (p) => {
     selection = p;
     selectionMoves = selection ? legalMoves(game.board, selection) : [];
+    clearMoveTarget();
     scene.setSelected(selection);
     scene.setHighlights(selectionMoves);
+    scene.setMoveTarget(null);
     rebuildBubble();
   },
   getSelectionMoves: () => selectionMoves,
   snapTo: (preset) => scene.snapTo(preset),
   applyAbilityAnimated: (ability) => {
     if (!selection) return;
-    // Reuse bubble logic for turned face + animation.
     const face =
       ability.kind === "FaceTurn"
         ? ability.from.face
@@ -371,6 +383,114 @@ const hud = bindHud({
       hud.sync();
       isAnimating = false;
     });
+  },
+});
+
+// --- Build the ordered ability list for the currently selected piece ---
+function currentAbilities(): Ability[] {
+  if (!selection) return [];
+  const piece = getPiece(game.board, selection);
+  if (!piece || !isCorner(selection)) return [];
+  const abilities: Ability[] = [];
+  const isBQ = piece.kind === "B" || piece.kind === "Q";
+  const isRQ = piece.kind === "R" || piece.kind === "Q";
+  if (isBQ) {
+    abilities.push({ kind: "FaceTurn", from: selection, dir: "CW" });
+    abilities.push({ kind: "FaceTurn", from: selection, dir: "CCW" });
+  }
+  if (isRQ) {
+    abilities.push({ kind: "LayerTurn", from: selection, axis: "row", dir: "CW" });
+    abilities.push({ kind: "LayerTurn", from: selection, axis: "row", dir: "CCW" });
+    abilities.push({ kind: "LayerTurn", from: selection, axis: "col", dir: "CW" });
+    abilities.push({ kind: "LayerTurn", from: selection, axis: "col", dir: "CCW" });
+  }
+  return abilities;
+}
+
+function triggerAbilityByIndex(index: number): void {
+  const abilities = currentAbilities();
+  const ability = abilities[index];
+  if (!ability || isAnimating) return;
+
+  const face =
+    ability.kind === "FaceTurn"
+      ? ability.from.face
+      : ability.axis === "row"
+        ? step(ability.from, ability.from.r === 0 ? "N" : "S").to.face
+        : step(ability.from, ability.from.c === 0 ? "W" : "E").to.face;
+
+  isAnimating = true;
+  bubble.style.pointerEvents = "none";
+  bubble.style.opacity = "0.6";
+  scene.animateTurn(face, ability.dir, 500, () => {
+    const next = applyAbility(game.board, ability);
+    game = { board: next };
+    selectionMoves = selection ? legalMoves(game.board, selection) : [];
+    scene.setHighlights(selectionMoves);
+    scene.sync();
+    hud.sync();
+    isAnimating = false;
+    bubble.style.pointerEvents = "auto";
+    bubble.style.opacity = "1";
+  });
+}
+
+// --- Keyboard shortcuts ---
+bindKeyboard({
+  selectNextPiece: () => {
+    if (isAnimating) return;
+    const positions = allPiecePositions();
+    if (positions.length === 0) return;
+    if (!selection) {
+      selectPiece(positions[0]);
+      return;
+    }
+    const idx = positions.findIndex((p) => isSamePos(p, selection!));
+    const next = (idx + 1) % positions.length;
+    selectPiece(positions[next]);
+  },
+  selectPrevPiece: () => {
+    if (isAnimating) return;
+    const positions = allPiecePositions();
+    if (positions.length === 0) return;
+    if (!selection) {
+      selectPiece(positions[positions.length - 1]);
+      return;
+    }
+    const idx = positions.findIndex((p) => isSamePos(p, selection!));
+    const prev = (idx - 1 + positions.length) % positions.length;
+    selectPiece(positions[prev]);
+  },
+  deselect: () => {
+    if (isAnimating) return;
+    deselectAll();
+  },
+  nextMoveTarget: () => {
+    if (!selection || selectionMoves.length === 0 || isAnimating) return;
+    moveTargetIndex = (moveTargetIndex + 1) % selectionMoves.length;
+    scene.setMoveTarget(selectionMoves[moveTargetIndex]);
+  },
+  prevMoveTarget: () => {
+    if (!selection || selectionMoves.length === 0 || isAnimating) return;
+    moveTargetIndex = (moveTargetIndex - 1 + selectionMoves.length) % selectionMoves.length;
+    scene.setMoveTarget(selectionMoves[moveTargetIndex]);
+  },
+  confirmMove: () => {
+    if (!selection || isAnimating) return;
+    if (moveTargetIndex >= 0 && moveTargetIndex < selectionMoves.length) {
+      executeMove(selection, selectionMoves[moveTargetIndex]);
+    }
+  },
+  snapTo: (preset) => scene.snapTo(preset),
+  zoomIn: () => scene.zoomIn(),
+  zoomOut: () => scene.zoomOut(),
+  triggerAbility: (n) => triggerAbilityByIndex(n - 1), // 1-indexed for user, 0-indexed internal
+  toggleHud: () => {
+    hudVisible = !hudVisible;
+    syncHudVisibility();
+  },
+  resetGame: () => {
+    window.location.reload();
   },
 });
 

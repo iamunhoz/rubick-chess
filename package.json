@@ -12,12 +12,14 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@types/mousetrap": "^1.6.15",
     "@types/three": "^0.183.1",
     "typescript": "~5.9.3",
     "vite": "^7.3.1",
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "mousetrap": "^1.6.5",
     "three": "^0.183.1"
   }
 }
