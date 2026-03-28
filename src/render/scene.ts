@@ -168,7 +168,7 @@ export async function createScene(
   const occluder = new THREE.Mesh(
     new THREE.BoxGeometry(occluderSize, occluderSize, occluderSize),
     new THREE.MeshStandardMaterial({
-      color: 0x1a1c24,
+      color: 0x4a2518, // dark wood core (deeper than walnut tiles)
       roughness: 1,
       metalness: 0,
       transparent: false,
@@ -180,20 +180,21 @@ export async function createScene(
 
   const tiles = new Map<string, any>();
   const tileGeom = new THREE.PlaneGeometry(TILE_SIZE * 0.95, TILE_SIZE * 0.95);
-  const baseA = 0xf0f2f7;
-  const baseB = 0x1a1d28;
+  const baseA = 0xd2a668; // warm light maple
+  const baseB = 0x6b3a2a; // dark walnut
   const highlightColor = 0x2f8cff;
   const moveColor = 0x2fe58c;
 
   for (const pos of allPositions()) {
     const { position, normal } = posToWorld(pos);
     const base = (pos.r + pos.c) % 2 === 0 ? baseA : baseB;
+    const isLight = base === baseA;
     const mat = new THREE.MeshStandardMaterial({
       color: base,
-      emissive: 0x000000,
-      emissiveIntensity: 0.45,
-      roughness: 0.95,
-      metalness: 0.0,
+      emissive: isLight ? 0x3a2510 : 0x000000, // subtle warm glow on light tiles
+      emissiveIntensity: isLight ? 0.12 : 0.0,
+      roughness: 0.88, // polished wood surface
+      metalness: 0.03, // faint wood grain sheen
     });
     const mesh = new THREE.Mesh(tileGeom, mat);
     mesh.position.copy(position);
@@ -235,10 +236,13 @@ export async function createScene(
     for (const [key, mesh] of tiles.entries()) {
       const mat = mesh.material as any;
       const base = mesh.userData.baseColor as number;
+      const isLight = base === baseA;
       mat.color.setHex(base);
-      mat.emissive.setHex(0x000000);
-      if (highlighted.has(key)) mat.emissive.setHex(moveColor);
-      if (selectedKey === key) mat.emissive.setHex(highlightColor);
+      // Restore warm emissive glow on light wood tiles by default
+      mat.emissive.setHex(isLight ? 0x3a2510 : 0x000000);
+      mat.emissiveIntensity = isLight ? 0.12 : 0.0;
+      if (highlighted.has(key)) { mat.emissive.setHex(moveColor); mat.emissiveIntensity = 0.45; }
+      if (selectedKey === key) { mat.emissive.setHex(highlightColor); mat.emissiveIntensity = 0.45; }
     }
   }
 
@@ -282,7 +286,7 @@ export async function createScene(
       const [face, r, c] = key.split(":");
       const pos: Pos = { face: face as Face, r: Number(r) as Pos["r"], c: Number(c) as Pos["c"] };
       const { position, normal } = posToWorld(pos);
-      model.position.copy(position.clone().add(normal.clone().multiplyScalar(0.52)));
+      model.position.copy(position.clone().add(normal.clone().multiplyScalar(0.08)));
       model.quaternion.copy(quatFromUpToNormal(normal));
       model.userData = { label: pieceLabel(piece.kind, piece.color) };
 

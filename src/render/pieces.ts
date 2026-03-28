@@ -92,20 +92,48 @@ function cloneMaterial(material: THREE.Material): THREE.Material {
   return material.clone();
 }
 
-export function createBlackMaterialVariant(material: THREE.Material): THREE.Material {
-  const variant = material.clone();
+/**
+ * Create a uniform warm ivory/porcelain material for white pieces.
+ * Returns a brand-new MeshStandardMaterial with fixed properties,
+ * ignoring the GLB's original material entirely. This guarantees
+ * every sub-mesh renders identically regardless of what the GLB
+ * shipped with.
+ */
+export function createWhiteMaterialVariant(_material: THREE.Material): THREE.Material {
+  return new THREE.MeshStandardMaterial({
+    color: 0xfff8e7,        // warm ivory
+    roughness: 0.45,         // porcelain sheen
+    metalness: 0.02,
+    emissive: 0x1a1408,      // subtle warm self-illumination
+    emissiveIntensity: 0.15,
+    vertexColors: false,
+    transparent: false,
+    opacity: 1.0,
+    depthWrite: true,
+    side: THREE.FrontSide,
+  });
+}
 
-  if ("color" in variant && variant.color instanceof THREE.Color) {
-    const hsl = { h: 0, s: 0, l: 0 };
-    variant.color.getHSL(hsl);
-    variant.color.setHSL(hsl.h, Math.min(1, hsl.s * 0.75), Math.max(0.08, hsl.l * 0.35));
-  }
-
-  if ("emissive" in variant && variant.emissive instanceof THREE.Color) {
-    variant.emissive.setHex(0x000000);
-  }
-
-  return variant;
+/**
+ * Create a uniform dark charcoal/graphite material for black pieces.
+ * Returns a brand-new MeshStandardMaterial with fixed properties,
+ * ignoring the GLB's original material entirely. Uses a visible
+ * dark charcoal (0x2a2a2e) instead of near-black so pieces remain
+ * distinguishable against dark walnut board tiles (0x6b3a2a).
+ */
+export function createBlackMaterialVariant(_material: THREE.Material): THREE.Material {
+  return new THREE.MeshStandardMaterial({
+    color: 0x2a2a2e,         // dark charcoal (NOT near-black)
+    roughness: 0.55,          // slightly polished
+    metalness: 0.05,
+    emissive: 0x0a0a0c,      // very subtle self-illumination so shape reads
+    emissiveIntensity: 0.12,
+    vertexColors: false,
+    transparent: false,
+    opacity: 1.0,
+    depthWrite: true,
+    side: THREE.FrontSide,
+  });
 }
 
 function traverseMeshes(root: THREE.Object3D, visit: MeshVisitor): void {
@@ -127,7 +155,18 @@ function cloneMeshWithWorldTransform(mesh: THREE.Mesh): THREE.Mesh {
     clone.material = cloneMaterial(mesh.material as THREE.Material);
   }
 
-  clone.applyMatrix4(mesh.matrixWorld);
+  // Bake world transform into geometry vertices directly so that
+  // downstream geometry-space operations (translate, bounding box)
+  // work correctly regardless of any rotation in the GLB hierarchy.
+  clone.geometry.applyMatrix4(mesh.matrixWorld);
+
+  // Reset mesh transform to identity — the world transform now lives
+  // entirely in the geometry vertices.
+  clone.position.set(0, 0, 0);
+  clone.rotation.set(0, 0, 0);
+  clone.scale.set(1, 1, 1);
+  clone.updateMatrix();
+
   return clone;
 }
 
@@ -136,15 +175,38 @@ function normalizePrototypeMesh(mesh: THREE.Mesh, kind: PieceKind, color: Color)
   const worldMesh = cloneMeshWithWorldTransform(mesh);
   root.add(worldMesh);
 
-  if (color === "B") {
-    traverseMeshes(root, (child) => {
-      if (Array.isArray(child.material)) {
-        child.material = child.material.map((m: THREE.Material) => createBlackMaterialVariant(m));
-      } else {
-        child.material = createBlackMaterialVariant(child.material as THREE.Material);
-      }
-    });
-  }
+  // Apply color-specific material variants.
+  // White pieces need explicit treatment to ensure GLB-inherited transparency
+  // is stripped and materials look solid (warm ivory / porcelain).
+  // Black pieces get their own darkened variant.
+  const materialTransform =
+    color === "W" ? createWhiteMaterialVariant : createBlackMaterialVariant;
+
+  traverseMeshes(root, (child) => {
+    if (Array.isArray(child.material)) {
+      child.material = child.material.map((m: THREE.Material) => materialTransform(m));
+    } else {
+      child.material = materialTransform(child.material as THREE.Material);
+    }
+  });
+
+  // Strip vertex colors and texture maps from geometry so our uniform
+  // materials aren't multiplied/overridden by GLB-baked data.
+  traverseMeshes(root, (child) => {
+    if (child.geometry.hasAttribute('color')) {
+      child.geometry.deleteAttribute('color');
+    }
+    // Also ensure the material doesn't have any inherited texture maps
+    const mat = child.material as THREE.MeshStandardMaterial;
+    if (mat.map) mat.map = null;
+    if (mat.normalMap) mat.normalMap = null;
+    if (mat.roughnessMap) mat.roughnessMap = null;
+    if (mat.metalnessMap) mat.metalnessMap = null;
+    if (mat.aoMap) mat.aoMap = null;
+    if (mat.emissiveMap) mat.emissiveMap = null;
+    if (mat.alphaMap) mat.alphaMap = null;
+    mat.needsUpdate = true;
+  });
 
   const bbox = new THREE.Box3().setFromObject(root);
   const size = new THREE.Vector3();
@@ -152,8 +214,7 @@ function normalizePrototypeMesh(mesh: THREE.Mesh, kind: PieceKind, color: Color)
   bbox.getSize(size);
   bbox.getCenter(center);
 
-  root.position.sub(center);
-  root.position.y += size.y / 2;
+  worldMesh.geometry.translate(-center.x, -center.y + size.y / 2, -center.z);
 
   const footprint = Math.max(size.x, size.z);
   const maxFootprint = 0.72;
@@ -255,5 +316,8 @@ export function createPieceSilhouette(model: THREE.Object3D): THREE.Object3D {
 
 export const __pieceInternals = {
   assignPieceKinds,
+  createWhiteMaterialVariant,
   createBlackMaterialVariant,
+  cloneMeshWithWorldTransform,
+  normalizePrototypeMesh,
 };
