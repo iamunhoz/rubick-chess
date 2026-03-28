@@ -4,7 +4,7 @@ import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js
 
 import type { Color, PieceKind } from "../rules/types";
 
-type PieceMap = Record<PieceKind, THREE.Mesh>;
+type PieceMap = Record<PieceKind, THREE.Object3D>;
 type ModelKey = `${Color}:${PieceKind}`;
 
 type MeshVisitor = (mesh: THREE.Mesh) => void;
@@ -34,8 +34,8 @@ function normalizeName(name: string): string {
   return name.trim().toLowerCase();
 }
 
-function meshHeight(mesh: THREE.Mesh): number {
-  const box = new THREE.Box3().setFromObject(mesh);
+function objectHeight(obj: THREE.Object3D): number {
+  const box = new THREE.Box3().setFromObject(obj);
   const size = new THREE.Vector3();
   box.getSize(size);
   return size.y;
@@ -52,21 +52,58 @@ function nameToKind(name: string): PieceKind | null {
   return null;
 }
 
-export function assignPieceKinds(candidates: THREE.Mesh[]): PieceMap {
-  const byKind = new Map<PieceKind, THREE.Mesh>();
-  const leftovers: THREE.Mesh[] = [];
+/**
+ * Infer piece kind from an Object3D by checking its name and all descendant names.
+ */
+function objectToKind(obj: THREE.Object3D): PieceKind | null {
+  const kind = nameToKind(obj.name);
+  if (kind) return kind;
+  // Check children/descendants for a recognisable name
+  let found: PieceKind | null = null;
+  obj.traverse((child) => {
+    if (!found) {
+      const k = nameToKind(child.name);
+      if (k) found = k;
+    }
+  });
+  return found;
+}
 
-  for (const mesh of candidates) {
-    const kind = nameToKind(mesh.name);
+/**
+ * Collect top-level piece objects from the GLB scene.
+ * Each direct child of the scene root that contains at least one mesh is
+ * treated as a separate piece candidate. This correctly handles both
+ * single-mesh pieces and multi-mesh pieces (Group -> child meshes).
+ */
+function collectPieceObjects(sceneRoot: THREE.Object3D): THREE.Object3D[] {
+  const pieces: THREE.Object3D[] = [];
+  for (const child of sceneRoot.children) {
+    let hasMesh = false;
+    child.traverse((node) => {
+      if ((node as THREE.Mesh).isMesh) hasMesh = true;
+    });
+    if (hasMesh) {
+      pieces.push(child);
+    }
+  }
+  return pieces;
+}
+
+export function assignPieceKinds(candidates: THREE.Object3D[]): PieceMap {
+  const byKind = new Map<PieceKind, THREE.Object3D>();
+  const leftovers: THREE.Object3D[] = [];
+
+  for (const obj of candidates) {
+    const kind = objectToKind(obj);
     if (kind && !byKind.has(kind)) {
-      byKind.set(kind, mesh);
+      byKind.set(kind, obj);
       continue;
     }
-    leftovers.push(mesh);
+    leftovers.push(obj);
   }
 
   const unresolvedKinds = KIND_ORDER.filter((kind) => !byKind.has(kind));
-  leftovers.sort((a, b) => meshHeight(a) - meshHeight(b));
+  leftovers.sort((a, b) => objectHeight(a) - objectHeight(b));
 
   for (let i = 0; i < unresolvedKinds.length && i < leftovers.length; i++) {
     byKind.set(unresolvedKinds[i], leftovers[i]);
@@ -170,10 +207,25 @@ function cloneMeshWithWorldTransform(mesh: THREE.Mesh): THREE.Mesh {
   return clone;
 }
 
-function normalizePrototypeMesh(mesh: THREE.Mesh, kind: PieceKind, color: Color): THREE.Group {
+function normalizePrototypeMesh(source: THREE.Object3D, kind: PieceKind, color: Color): THREE.Group {
   const root = new THREE.Group();
-  const worldMesh = cloneMeshWithWorldTransform(mesh);
-  root.add(worldMesh);
+
+  // Collect ALL meshes from the source (handles both single Mesh and Group
+  // with multiple child meshes). Clone each with its baked world transform
+  // so they assemble correctly relative to each other.
+  const sourceMeshes: THREE.Mesh[] = [];
+  source.traverse((child) => {
+    if ((child as THREE.Mesh).isMesh) {
+      sourceMeshes.push(child as THREE.Mesh);
+    }
+  });
+
+  const clonedMeshes: THREE.Mesh[] = [];
+  for (const mesh of sourceMeshes) {
+    const worldMesh = cloneMeshWithWorldTransform(mesh);
+    root.add(worldMesh);
+    clonedMeshes.push(worldMesh);
+  }
 
   // Apply color-specific material variants.
   // White pieces need explicit treatment to ensure GLB-inherited transparency
@@ -214,7 +266,12 @@ function normalizePrototypeMesh(mesh: THREE.Mesh, kind: PieceKind, color: Color)
   bbox.getSize(size);
   bbox.getCenter(center);
 
-  worldMesh.geometry.translate(-center.x, -center.y + size.y / 2, -center.z);
+  // Translate ALL cloned meshes so the piece is centered at origin with
+  // its base at y=0.
+  const offset = new THREE.Vector3(-center.x, -center.y + size.y / 2, -center.z);
+  for (const mesh of clonedMeshes) {
+    mesh.geometry.translate(offset.x, offset.y, offset.z);
+  }
 
   const footprint = Math.max(size.x, size.z);
   const maxFootprint = 0.72;
@@ -239,13 +296,15 @@ function cloneModelForUse(proto: THREE.Object3D): THREE.Object3D {
 
 async function buildModelCache(): Promise<void> {
   const gltf = await loader.loadAsync(glbUrl);
-  const meshes: THREE.Mesh[] = [];
   gltf.scene.updateWorldMatrix(true, true);
-  traverseMeshes(gltf.scene, (mesh) => {
-    meshes.push(mesh);
-  });
 
-  const mapped = assignPieceKinds(meshes);
+  // Collect top-level piece objects from the GLB scene. Each direct child
+  // that contains meshes is treated as one piece candidate. This correctly
+  // groups multi-mesh pieces (e.g. a knight composed of body + mane meshes)
+  // so they are assigned as a single unit rather than split apart.
+  const pieceObjects = collectPieceObjects(gltf.scene);
+
+  const mapped = assignPieceKinds(pieceObjects);
 
   for (const kind of KIND_ORDER) {
     modelCache.set(`W:${kind}`, normalizePrototypeMesh(mapped[kind], kind, "W"));
@@ -320,4 +379,6 @@ export const __pieceInternals = {
   createBlackMaterialVariant,
   cloneMeshWithWorldTransform,
   normalizePrototypeMesh,
+  collectPieceObjects,
+  objectToKind,
 };
