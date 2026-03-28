@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js";
 
 export type SnapPreset = "F" | "B" | "L" | "R" | "U" | "D" | "I";
 
@@ -36,20 +36,20 @@ export function createCameraRig(rendererDom: HTMLCanvasElement, initialSize: { w
   camera.position.set(7, 6, 7);
   camera.lookAt(0, 0, 0);
 
-  const controls = new OrbitControls(camera, rendererDom);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
+  const controls = new TrackballControls(camera, rendererDom);
+  controls.rotateSpeed = 3.0;
+  controls.zoomSpeed = 1.2;
+  controls.noPan = true;
   controls.target.set(0, 0, 0);
-  controls.enablePan = false;
+  controls.staticMoving = false;
+  controls.dynamicDampingFactor = 0.15;
+  controls.minDistance = 4;
+  controls.maxDistance = 25;
   controls.mouseButtons = {
     LEFT: THREE.MOUSE.ROTATE,
     MIDDLE: THREE.MOUSE.DOLLY,
     RIGHT: THREE.MOUSE.ROTATE,
   };
-  controls.minDistance = 4;
-  controls.maxDistance = 25;
-  controls.minPolarAngle = 0.2;
-  controls.maxPolarAngle = Math.PI - 0.2;
   controls.update();
 
   function snapTo(preset: SnapPreset): void {

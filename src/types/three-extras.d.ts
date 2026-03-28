@@ -1,4 +1,3 @@
-declare module "three/examples/jsm/controls/OrbitControls.js" {
-  export const OrbitControls: any;
+declare module "three/examples/jsm/controls/TrackballControls.js" {
+  export const TrackballControls: any;
 }
-
