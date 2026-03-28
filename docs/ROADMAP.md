@@ -3,6 +3,9 @@
 See `docs/discovery/2026-03-28-roadmap-discovery.md` for full details from discovery session.
 
 ## Phase 1 — UI Polish
+
+> **Required tooling:** The [Impeccable](https://github.com/pbakaus/impeccable) skill suite is installed and MUST be used for all UI polish work in this phase. Use the relevant `/` skills (`/polish`, `/critique`, `/arrange`, `/animate`, `/delight`, `/colorize`, `/quieter`, `/adapt`, `/clarify`, `/extract`, `/normalize`, `/audit`, `/optimize`, `/harden`, `/bolder`, `/distill`, `/typeset`, `/overdrive`) as appropriate for each task.
+
 - ~~Undo support~~ (removed — no undo in chess)
 - HUD cleanup: bubble only (remove sidebar rotation controls)
 - Move animations: knights hop, others slide across cube surfaces

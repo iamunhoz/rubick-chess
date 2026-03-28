@@ -92,7 +92,9 @@ Skills (slash commands) most useful during development of this project.
 | **simplify** | `/simplify` | After implementing a feature — reviews changed code for reuse, quality, and efficiency |
 | **cspell** | `/cspell` | When CI flags unknown words in code comments or string literals |
 
-### Visual & UI
+### Visual & UI (Impeccable Suite)
+
+> These skills come from the [Impeccable](https://github.com/pbakaus/impeccable) skill suite and MUST be used for all Phase 1 UI polish work.
 
 | Skill | Command | When to use |
 |-------|---------|-------------|
@@ -105,6 +107,12 @@ Skills (slash commands) most useful during development of this project.
 | **quieter** | `/quieter` | If visual effects become overstimulating — tone down without losing quality |
 | **adapt** | `/adapt` | Make the game work across screen sizes (mobile touch, tablet, desktop) |
 | **clarify** | `/clarify` | Improve UX copy — ability labels, error messages, status text in the HUD |
+| **extract** | `/extract` | Extract reusable components and design tokens into a design system |
+| **normalize** | `/normalize` | Audit and realign UI to match design system standards and tokens |
+| **bolder** | `/bolder` | Amplify safe/bland designs to be more visually interesting |
+| **distill** | `/distill` | Strip designs to their essence, remove unnecessary complexity |
+| **typeset** | `/typeset` | Fix font choices, hierarchy, sizing, weight, and readability |
+| **overdrive** | `/overdrive` | Push past conventional limits — shaders, spring physics, 60fps animations |
 
 ### Performance & Reliability
 

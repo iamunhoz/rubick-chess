@@ -43,7 +43,7 @@ After completing any task that changes game behavior or UI, you MUST visually ve
 #### Playwright MCP Tools to Use
 
 - `mcp__playwright__browser_navigate` — open `http://localhost:5173`
-- `mcp__playwright__browser_take_screenshot` — capture the viewport (use `type: "png"`)
+- `mcp__playwright__browser_take_screenshot` — capture the viewport (use `type: "png"`). **Save screenshots to `/tmp/`**, not the project root.
 - `mcp__playwright__browser_press_key` — send keyboard input (e.g., `key: "Tab"`, `key: "ArrowRight"`, `key: "Enter"`, `key: "f"`, `key: "3"`, `key: "Escape"`)
 - Do NOT rely on `browser_snapshot` for game state — the WebGL canvas has no accessible DOM nodes.
 
